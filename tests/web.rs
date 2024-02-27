@@ -26,9 +26,6 @@ use zcash_note_encryption::{batch, try_compact_note_decryption, try_note_decrypt
 #[wasm_bindgen_test]
 fn what() {
     let rng = OsRng;
-    console::time_with_label("Build PK");
-    let pk = ProvingKey::build();
-    console::time_end_with_label("Build PK");
 
     console::time_with_label("Create Valid IVK");
     let fvk = FullViewingKey::from(&SpendingKey::from_bytes([7; 32]).unwrap());
@@ -48,6 +45,10 @@ fn what() {
         })
         .collect();
     console::time_end_with_label("Create Invalid IVKs");
+
+    console::time_with_label("Build PK");
+    let pk = ProvingKey::build();
+    console::time_end_with_label("Build PK");
 
     console::time_with_label("Create Bundle");
     let bundle = {
