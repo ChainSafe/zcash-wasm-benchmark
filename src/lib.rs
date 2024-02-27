@@ -8,7 +8,12 @@ use orchard::{
     value::NoteValue,
     Anchor, Bundle,
 };
+use rand::rngs::OsRng;
+use rayon::prelude::*;
 use wasm_bindgen::prelude::*;
+pub use wasm_bindgen_rayon::init_thread_pool;
+use web_sys::console;
+use zcash_note_encryption::{batch, try_compact_note_decryption, try_note_decryption};
 #[wasm_bindgen]
 extern "C" {
     fn alert(s: &str);
