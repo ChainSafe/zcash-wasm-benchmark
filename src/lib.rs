@@ -13,18 +13,7 @@ use rayon::prelude::*;
 use wasm_bindgen::prelude::*;
 pub use wasm_bindgen_rayon::init_thread_pool;
 use web_sys::console;
-use zcash_note_encryption::{batch, try_compact_note_decryption, try_note_decryption};
-#[wasm_bindgen]
-extern "C" {
-    fn alert(s: &str);
-}
-
-#[wasm_bindgen]
-pub fn greet() {
-    let pk = ProvingKey::build();
-    let fvk = FullViewingKey::from(&SpendingKey::from_bytes([7; 32]).unwrap());
-    alert("Hello, zcash-wasm-benchmark!");
-}
+use zcash_note_encryption::try_note_decryption;
 
 #[wasm_bindgen]
 pub fn what() {

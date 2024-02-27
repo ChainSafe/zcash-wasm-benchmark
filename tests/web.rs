@@ -4,7 +4,7 @@
 
 extern crate wasm_bindgen_test;
 use rand::rngs::OsRng;
-use wasm_bindgen::prelude::wasm_bindgen;
+
 use wasm_bindgen_test::*;
 
 use rayon::prelude::*;
@@ -21,7 +21,7 @@ use orchard::{
     value::NoteValue,
     Anchor, Bundle,
 };
-use zcash_note_encryption::{batch, try_compact_note_decryption, try_note_decryption};
+use zcash_note_encryption::try_note_decryption;
 
 #[wasm_bindgen_test]
 fn what() {
