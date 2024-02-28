@@ -14,7 +14,9 @@
 import init, { initThreadPool, what } from './pkg/zcash_wasm_benchmark.js';
 
 await init();
-await initThreadPool(navigator.hardwareConcurrency);
+let num_concurrency = navigator.hardwareConcurrency;
+console.log("num_concurrency: ", num_concurrency);
+await initThreadPool(num_concurrency);
 // // 1...10
 // let arr = Int32Array.from({ length: 10 }, (_, i) => i + 1);
 // if (sum(arr) !== 55) {

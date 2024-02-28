@@ -13,15 +13,11 @@ use rayon::prelude::*;
 use wasm_bindgen::prelude::*;
 pub use wasm_bindgen_rayon::init_thread_pool;
 use web_sys::console;
-use zcash_note_encryption::try_note_decryption;
+use zcash_note_encryption::{batch, try_compact_note_decryption, try_note_decryption};
 
 #[wasm_bindgen]
 pub fn what() {
     let rng = OsRng;
-    // Takes a long time...
-    console::time_with_label("Build PK");
-    let pk = ProvingKey::build();
-    console::time_end_with_label("Build PK");
 
     console::time_with_label("Create Valid IVK");
     let fvk = FullViewingKey::from(&SpendingKey::from_bytes([7; 32]).unwrap());
@@ -29,10 +25,11 @@ pub fn what() {
     let recipient = valid_ivk.address_at(0u32);
     let valid_ivk = PreparedIncomingViewingKey::new(&valid_ivk);
     console::time_end_with_label("Create Valid IVK");
-    console::time_with_label("Create Invalid IVKs");
+
+    console::time_with_label("Parallel Create Invalid IVKs");
     let invalid_ivks: Vec<_> = (0u32..10240)
-        // .map(|i| {
         .into_par_iter()
+        // .with_min_len(10240/8)
         .map(|i| {
             let mut sk = [0; 32];
             sk[..4].copy_from_slice(&i.to_le_bytes());
@@ -40,7 +37,12 @@ pub fn what() {
             PreparedIncomingViewingKey::new(&fvk.to_ivk(Scope::External))
         })
         .collect();
-    console::time_end_with_label("Create Invalid IVKs");
+    console::time_end_with_label("Parallel Create Invalid IVKs");
+
+    // Takes a long time...
+    console::time_with_label("Build PK");
+    let pk = ProvingKey::build();
+    console::time_end_with_label("Build PK");
 
     console::time_with_label("Create Bundle");
     let bundle = {
@@ -69,7 +71,33 @@ pub fn what() {
     let compact = CompactAction::from(action);
     console::time_end_with_label("Compact");
 
-    console::time_with_label("Decrypt");
-    try_note_decryption(&domain, &valid_ivk, action).unwrap();
-    console::time_end_with_label("Decrypt");
+    console::time_with_label("Decrypt Valid");
+    try_compact_note_decryption(&domain, &valid_ivk, &compact).unwrap();
+    console::time_end_with_label("Decrypt Valid");
+
+    let ivks = 2;
+    let valid_ivks = vec![valid_ivk; ivks];
+    let actions: Vec<_> = (0..100)
+        .map(|_| (OrchardDomain::for_action(action), action.clone()))
+        .collect();
+    let compact: Vec<_> = (0..100)
+        .map(|_| {
+            (
+                OrchardDomain::for_action(action),
+                CompactAction::from(action),
+            )
+        })
+        .collect();
+
+    for size in [10, 50, 100] {
+        console::time_with_label(&format!("Decrypt Valid {}", size));
+        batch::try_compact_note_decryption(&valid_ivks, &compact[..size]);
+
+        // group.bench_function(BenchmarkId::new("compact-invalid", size), |b| {
+        //     b.iter(|| {
+        //         batch::try_compact_note_decryption(&invalid_ivks[..ivks], &compact[..size])
+        //     })
+        // });
+        console::time_end_with_label(&format!("Decrypt Valid {}", size));
+    }
 }
