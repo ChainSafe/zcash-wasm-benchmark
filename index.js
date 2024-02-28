@@ -11,7 +11,7 @@
  * limitations under the License.
  */
 
-import init, { initThreadPool, what } from './pkg/zcash_wasm_benchmark.js';
+import init, { initThreadPool, what, proof } from './pkg/zcash_wasm_benchmark.js';
 
 await init();
 let num_concurrency = navigator.hardwareConcurrency;
@@ -22,8 +22,7 @@ await initThreadPool(num_concurrency);
 // if (sum(arr) !== 55) {
 //   throw new Error('Wrong result.');
 // }
-what();
-
+proof();
 // Note: this will be overridden by the Playwright test runner.
 // The default implementation is provided only for manual testing.
 globalThis.onDone ??= () => console.log('OK');
