@@ -5,6 +5,7 @@
 extern crate wasm_bindgen_test;
 use rand::rngs::OsRng;
 
+use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use rayon::prelude::*;
@@ -24,9 +25,16 @@ use orchard::{
 use zcash_note_encryption::try_note_decryption;
 
 #[wasm_bindgen_test]
-fn what() {
+async fn what() {
+    let _ = JsFuture::from(init_thread_pool(
+        web_sys::window()
+            .unwrap()
+            .navigator()
+            .hardware_concurrency() as usize,
+    ))
+    .await;
     let rng = OsRng;
-
+    console::log_1(&"start".into());
     console::time_with_label("Create Valid IVK");
     let fvk = FullViewingKey::from(&SpendingKey::from_bytes([7; 32]).unwrap());
     let valid_ivk = fvk.to_ivk(Scope::External);

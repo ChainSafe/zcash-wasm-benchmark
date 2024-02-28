@@ -5,9 +5,7 @@ authors = ["eric"]
 edition = "2018"
 
 [lib]
-crate-type = ["cdylib"]
-
-
+crate-type = ["cdylib", "rlib"]
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.
@@ -34,7 +32,8 @@ wasm-bindgen-futures = "0.4.41"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"
-
+wasm-bindgen-rayon = {version = "1.2", features = ["no-bundler"] }
+web-sys = {version = "0.3.68", features = ["console", "Window", "Navigator"]}
 
 [features]
 default = ["console_error_panic_hook"]

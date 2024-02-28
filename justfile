@@ -29,6 +29,14 @@ serve:
 # Builds the WASM binaries and starts the Python webserver
 start profile=default_profile: (build-all profile) serve
 
+# Test in headless mode on firefox
+test-headless-firefox:
+    wasm-pack test  --release  --headless --firefox
+
+# Test in headless mode on chrome
+test-headless-chrome:
+    wasm-pack test  --release  --headless --chrome
+
 # Clean the WASM binaries and other artifacts from wasm-pack
 clean-wasm:
     rm -rf pkg
