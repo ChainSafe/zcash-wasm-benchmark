@@ -33,6 +33,7 @@ async fn what() {
             .hardware_concurrency() as usize,
     ))
     .await;
+
     let rng = OsRng;
     console::log_1(&"start".into());
     console::time_with_label("Create Valid IVK");
