@@ -16,7 +16,7 @@ build-parallel profile=default_profile: (_check-profile profile)
 
 # Build WASM binary without Parallel feature
 build-no-parallel profile=default_profile: (_check-profile profile)
-    @echo Building without Parallel feature in {{ profile }} mode 
+    @echo Building without Parallel feature in {{ profile }} mode
     wasm-pack build -t web  --{{ profile }} --out-dir pkg/serial
 
 _check-profile profile:
@@ -30,12 +30,12 @@ serve:
 start profile=default_profile: (build-all profile) serve
 
 # Test in headless mode on firefox
-test-headless-firefox:
-    wasm-pack test  --release  --headless --firefox
+test-headless-firefox +FLAGS:
+    wasm-pack test  --release  --headless --firefox {{FLAGS}}
 
 # Test in headless mode on chrome
-test-headless-chrome:
-    wasm-pack test  --release  --headless --chrome
+test-headless-chrome +FLAGS:
+    wasm-pack test  --release  --headless --chrome {{FLAGS}}
 
 # Clean the WASM binaries and other artifacts from wasm-pack
 clean-wasm:
