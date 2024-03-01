@@ -44,3 +44,12 @@ clean-wasm:
 # Clean all
 clean: clean-wasm
     rm -rf target
+
+# Use the protobuf definitions to generate the javascript files for grpc-web
+generate-pb-js:
+    mkdir -p blockstream/generated
+    protoc -I=./blockstream/proto service.proto compact_formats.proto --js_out=import_style=commonjs:./blockstream/generated --grpc-web_out=import_style=commonjs,mode=grpcwebtext:./blockstream/generated
+
+# run a local proxy to the lightwalletd server on port 443
+run-proxy:
+    grpcwebproxy --backend_addr=ai.lightwalletd.com:443 --run_tls_server=false --backend_tls --allow_all_origins --server_http_debug_port 443
