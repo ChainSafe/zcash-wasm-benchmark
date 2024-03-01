@@ -179,3 +179,11 @@ pub fn what() {
         console::time_end_with_label(&format!("Decrypt Valid {}", size));
     }
 }
+
+// #[wasm_bindgen]
+// pub fn trial_decrypt_compact_note(action: CompactAction) {
+//     let compact_action = CompactAction::from_parts(
+
+//     );
+//     try_compact_note_decryption(&domain, &valid_ivk, &compact).unwrap();
+// }
