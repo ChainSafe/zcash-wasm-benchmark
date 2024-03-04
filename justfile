@@ -3,10 +3,10 @@ default_profile := "release"
 default:
     just --list
 
-alias b := build-all
+alias b := build-rust
 
 # Build both parallel and non parallel WASM binaries
-build-all profile=default_profile: (_check-profile profile) && (build-parallel profile) (build-no-parallel profile)
+build-rust profile=default_profile: (_check-profile profile) && (build-parallel profile) (build-no-parallel profile)
     @echo Building both Parallel and non Parallel features in {{ profile }} mode
 
 # Build WASM binary with Parallel feature
@@ -22,20 +22,17 @@ build-no-parallel profile=default_profile: (_check-profile profile)
 _check-profile profile:
     @echo {{ if profile =~ "release|debug|profiling" { "" } else { error("Profile must be one of: release|debug|profiling") } }} > /dev/null 2>&1
 
-# Start the Python webserver
+# Serves the web page using Parcel
 serve:
-    python3 server.py
-
-# Builds the WASM binaries and starts the Python webserver
-start profile=default_profile: (build-all profile) serve
+    cd blockstream && yarn && yarn parcel index.html
 
 # Test in headless mode on firefox
 test-headless-firefox +FLAGS:
-    wasm-pack test  --release  --headless --firefox {{FLAGS}}
+    wasm-pack test  --release --features=no-bundler --headless --firefox {{FLAGS}}
 
 # Test in headless mode on chrome
 test-headless-chrome +FLAGS:
-    wasm-pack test  --release  --headless --chrome {{FLAGS}}
+    wasm-pack test  --release --features=no-bundler  --headless --chrome {{FLAGS}}
 
 # Clean the WASM binaries and other artifacts from wasm-pack
 clean-wasm:

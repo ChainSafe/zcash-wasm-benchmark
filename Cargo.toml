@@ -27,17 +27,17 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 
 zcash_note_encryption = "0.4.0"
 orchard = { version = "0.7.0", default-features = false }
-getrandom = {version = "0.2.12", features = ["js"] }
-web-sys = {version = "0.3.68", features = ["console"] }
+getrandom = { version = "0.2.12", features = ["js"] }
+web-sys = { version = "0.3.68", features = ["console"] }
 rand = "0.8.5"
 rayon = "1.8"
-wasm-bindgen-rayon = {version = "1.2", features = ["no-bundler"], optional = true }
+wasm-bindgen-rayon = { version = "1.2", optional = true }
 wasm-bindgen-futures = "0.4.41"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"
-wasm-bindgen-rayon = {version = "1.2", features = ["no-bundler"] }
-web-sys = {version = "0.3.68", features = ["console", "Window", "Navigator"]}
+wasm-bindgen-rayon = { version = "1.2" }
+web-sys = { version = "0.3.68", features = ["console", "Window", "Navigator"] }
 
 [build-dependencies]
 protobuf-codegen = "3.4.0"
@@ -45,3 +45,4 @@ protobuf-codegen = "3.4.0"
 [features]
 default = ["console_error_panic_hook"]
 parallel = ["wasm-bindgen-rayon", "orchard/multicore"]
+no-bundler = ["wasm-bindgen-rayon/no-bundler"]
