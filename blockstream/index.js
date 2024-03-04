@@ -26,7 +26,7 @@ function setupBtn(id, { proof, what }) {
   Object.assign(document.getElementById(id), {
     async onclick() {
       const start = performance.now();
-      what();
+      proof();
       const time = performance.now() - start;
 
       console.log(`${time.toFixed(2)} ms`);
