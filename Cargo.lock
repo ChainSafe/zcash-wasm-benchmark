@@ -1181,6 +1181,7 @@ dependencies = [
  "console_error_panic_hook",
  "getrandom",
  "orchard",
+ "protobuf",
  "protobuf-codegen",
  "rand",
  "rayon",
