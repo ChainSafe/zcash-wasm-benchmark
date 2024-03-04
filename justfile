@@ -12,12 +12,12 @@ build-all profile=default_profile: (_check-profile profile) && (build-parallel p
 # Build WASM binary with Parallel feature
 build-parallel profile=default_profile: (_check-profile profile)
     @echo Building with Parallel feature in {{ profile }} mode
-    wasm-pack build -t web  --{{ profile }} --out-dir pkg/parallel --features=parallel
+    wasm-pack build -t web  --{{ profile }} --out-dir blockstream/wasm-pkg/parallel --features=parallel
 
 # Build WASM binary without Parallel feature
 build-no-parallel profile=default_profile: (_check-profile profile)
     @echo Building without Parallel feature in {{ profile }} mode
-    wasm-pack build -t web  --{{ profile }} --out-dir pkg/serial
+    wasm-pack build -t web  --{{ profile }} --out-dir blockstream/wasm-pkg/serial
 
 _check-profile profile:
     @echo {{ if profile =~ "release|debug|profiling" { "" } else { error("Profile must be one of: release|debug|profiling") } }} > /dev/null 2>&1
@@ -39,7 +39,7 @@ test-headless-chrome +FLAGS:
 
 # Clean the WASM binaries and other artifacts from wasm-pack
 clean-wasm:
-    rm -rf pkg
+    rm -rf blockstream/wasm-pkg
 
 # Clean all
 clean: clean-wasm
