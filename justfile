@@ -48,7 +48,7 @@ clean: clean-wasm
 # Use the protobuf definitions to generate the javascript files for grpc-web
 generate-pb-js:
     mkdir -p blockstream/generated
-    protoc -I=./blockstream/proto service.proto compact_formats.proto --js_out=import_style=commonjs:./blockstream/generated --grpc-web_out=import_style=commonjs,mode=grpcwebtext:./blockstream/generated
+    protoc -I=./protos service.proto compact_formats.proto --js_out=import_style=commonjs:./blockstream/generated --grpc-web_out=import_style=commonjs,mode=grpcwebtext:./blockstream/generated
 
 # run a local proxy to the lightwalletd server on port 443
 run-proxy:

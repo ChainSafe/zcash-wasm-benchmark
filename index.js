@@ -1,14 +1,14 @@
 let num_concurrency = navigator.hardwareConcurrency;
 console.log("num_concurrency: ", num_concurrency);
 
-function setupBtn(id, { proof }) {
+function setupBtn(id, { proof, what }) {
     // Assign onclick handler + enable the button.
     Object.assign(document.getElementById(id), {
       async onclick() {
         const start = performance.now();
-        proof()
+        what()
         const time = performance.now() - start;
-  
+
         console.log(`${time.toFixed(2)} ms`);
       },
       disabled: false
@@ -20,7 +20,7 @@ function setupBtn(id, { proof }) {
     await singleThread.default();
     setupBtn('singleThread', singleThread);
   })();
-  
+
 (async function initMultiThread() {
     const multiThread = await import('./pkg/parallel/zcash_wasm_benchmark.js');
     await multiThread.default();
