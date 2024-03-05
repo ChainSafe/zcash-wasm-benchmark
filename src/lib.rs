@@ -1,5 +1,4 @@
 mod utils;
-
 use orchard::{
     builder::{Builder, BundleType},
     circuit::{ProvingKey, VerifyingKey},
@@ -8,8 +7,10 @@ use orchard::{
     value::NoteValue,
     Anchor, Bundle,
 };
+use protobuf_json_mapping::{parse_from_str, ParseOptions};
 use rand::rngs::OsRng;
-
+mod codegen;
+use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
 use web_sys::console;
@@ -178,6 +179,19 @@ pub fn what() {
         // });
         console::time_end_with_label(&format!("Decrypt Valid {}", size));
     }
+}
+
+#[wasm_bindgen]
+pub fn b(block_ser: &str) {
+    let block: codegen::compact_formats::CompactBlock = parse_from_str(block_ser).unwrap();
+
+    console::log_1(&format!("height {:?}", block.height).into());
+    console::log_1(&format!("{:?}", block).into());
+}
+
+#[wasm_bindgen(start)]
+pub fn start() {
+    set_panic_hook();
 }
 
 // #[wasm_bindgen]
