@@ -17,8 +17,8 @@ function setupBtnDownload(id, { b }) {
       blockStream.on("data", function (response) {
         console.log(response);
 
-        console.log(response.toObject());
-        b(JSON.stringify(response));
+        console.log(JSON.stringify(response.toObject()));
+        b(JSON.stringify(response.toObject()));
       });
 
       blockStream.on("status", function (status) {
