@@ -7,7 +7,7 @@ use orchard::{
     value::NoteValue,
     Anchor, Bundle,
 };
-use protobuf_json_mapping::{parse_from_str, parse_from_str_with_options, ParseOptions};
+use protobuf_json_mapping::{parse_from_str, ParseOptions};
 use rand::rngs::OsRng;
 mod codegen;
 use utils::set_panic_hook;
@@ -183,12 +183,7 @@ pub fn what() {
 
 #[wasm_bindgen]
 pub fn b(block_ser: &str) {
-    let opt: ParseOptions = ParseOptions {
-        ignore_unknown_fields: true,
-        ..Default::default()
-    };
-    let block: codegen::compact_formats::CompactBlock =
-        parse_from_str_with_options(block_ser, &opt).unwrap();
+    let block: codegen::compact_formats::CompactBlock = parse_from_str(block_ser).unwrap();
 
     console::log_1(&format!("height {:?}", block.height).into());
     console::log_1(&format!("{:?}", block).into());
