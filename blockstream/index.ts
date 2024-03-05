@@ -1,24 +1,33 @@
 import { LwdClient, buildBlockRange } from "./blockstream.js";
+import { CompactBlock } from './generated/compact_formats_pb.ts';
 
 let num_concurrency = navigator.hardwareConcurrency;
 console.log("num_concurrency: ", num_concurrency);
 
-function setupBtnDownload(id, { b }) {
+const ORCHARD_ACTIVATION = 1687104;
+const START = ORCHARD_ACTIVATION;
+const END = ORCHARD_ACTIVATION+10000;
+
+function setupBtnDownload(id, { decrypt_all_notes }) {
   // Assign onclick handler + enable the button.
   Object.assign(document.getElementById(id), {
     async onclick() {
-      let client = new LwdClient("http://0.0.0.0:443");
+      let blocksProcessed = 0;
+      let notesProcessed = 0;
+      let start = performance.now();
+
+      let client = new LwdClient("http://0.0.0.0:443", null, null);
 
       let blockStream = client.getBlockRange(
-        buildBlockRange(2419904, 2411000),
+        buildBlockRange(START, END),
         {},
       );
 
-      blockStream.on("data", function (response) {
-        console.log(response);
-
-        console.log(JSON.stringify(response.toObject()));
-        b(JSON.stringify(response.toObject()));
+      blockStream.on("data", function (response: CompactBlock) {
+        // console.log(response.toObject());
+        blocksProcessed++;
+        // console.log("blocksProcessed: ", blocksProcessed);
+        notesProcessed += decrypt_all_notes(response.serializeBinary());
       });
 
       blockStream.on("status", function (status) {
@@ -29,6 +38,9 @@ function setupBtnDownload(id, { b }) {
 
       blockStream.on("end", function (end) {
         console.log("stream ended");
+        console.log("notesProcessed: ", notesProcessed);
+        console.log("blocksProcessed: ", blocksProcessed);
+        console.log("time: ", performance.now() - start);
       });
     },
     disabled: false,

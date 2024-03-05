@@ -1,4 +1,3 @@
-mod utils;
 use orchard::{
     builder::{Builder, BundleType},
     circuit::{ProvingKey, VerifyingKey},
@@ -7,14 +6,20 @@ use orchard::{
     value::NoteValue,
     Anchor, Bundle,
 };
-use protobuf_json_mapping::{parse_from_str, ParseOptions};
 use rand::rngs::OsRng;
-mod codegen;
+
+use std::convert::TryInto;
+
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
-
+use protobuf::Message;
 use web_sys::console;
 use zcash_note_encryption::{batch, try_compact_note_decryption, try_note_decryption};
+use codegen::compact_formats as pb;
+
+mod utils;
+mod codegen;
+mod conversions;
 
 #[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;
@@ -182,22 +187,46 @@ pub fn what() {
 }
 
 #[wasm_bindgen]
-pub fn b(block_ser: &str) {
-    let block: codegen::compact_formats::CompactBlock = parse_from_str(block_ser).unwrap();
+pub fn b(block_ser: Vec<u8>) {
+    let block =  pb::CompactBlock::parse_from_bytes(&block_ser).unwrap();
 
     console::log_1(&format!("height {:?}", block.height).into());
     console::log_1(&format!("{:?}", block).into());
+}
+
+#[wasm_bindgen]
+/// Generate a random view key and trial-decrypts all notes in a given block
+/// Each trial decryption is timed and logged to the console
+/// Returns the total number of notes in the block
+pub fn decrypt_all_notes(block_bytes: Vec<u8>) -> u32 {
+    let block =  pb::CompactBlock::parse_from_bytes(&block_bytes).unwrap();
+
+    let fvk = FullViewingKey::from(&SpendingKey::from_bytes([7; 32]).unwrap());
+    let ivk = PreparedIncomingViewingKey::new(&fvk.to_ivk(Scope::External));
+
+    let mut note_count = 0;
+
+    block.vtx.into_iter().for_each(|tx| {
+        tx.actions.into_iter().for_each(|pb_action| {
+            note_count += 1;
+
+            let compact: CompactAction = pb_action.try_into().unwrap();
+            let domain = OrchardDomain::for_nullifier(compact.nullifier());
+
+            console::time_with_label(&format!("Decrypt {:?}", compact)); // this needs to be unique for each note otherwise it gets confused
+            let result = try_compact_note_decryption(&domain, &ivk, &compact);
+            console::time_end_with_label(&format!("Decrypt {:?}", compact));
+
+            match result {
+                None => console::log_1(&"Note not for this address".into()),
+                Some((note, _recipient)) => console::log_1(&format!("Note: {:?}", note).into()),
+            }
+        });
+    });
+    note_count
 }
 
 #[wasm_bindgen(start)]
 pub fn start() {
     set_panic_hook();
 }
-
-// #[wasm_bindgen]
-// pub fn trial_decrypt_compact_note(action: CompactAction) {
-//     let compact_action = CompactAction::from_parts(
-
-//     );
-//     try_compact_note_decryption(&domain, &valid_ivk, &compact).unwrap();
-// }
