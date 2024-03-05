@@ -1,25 +1,39 @@
 import { LwdClient, buildBlockRange } from "./blockstream.js";
 
-let client = new LwdClient("http://0.0.0.0:443");
-
-let blockStream = client.getBlockRange(buildBlockRange(2419904, 2411000), {});
-
-blockStream.on("data", function (response) {
-  console.log(response.toObject());
-});
-
-blockStream.on("status", function (status) {
-  console.log("status code: ", status.code);
-  console.log("details: ", status.details);
-  console.log("metadata: ", status.metadata);
-});
-
-blockStream.on("end", function (end) {
-  console.log("stream ended");
-});
-
 let num_concurrency = navigator.hardwareConcurrency;
 console.log("num_concurrency: ", num_concurrency);
+
+function setupBtnDownload(id, { b }) {
+  // Assign onclick handler + enable the button.
+  Object.assign(document.getElementById(id), {
+    async onclick() {
+      let client = new LwdClient("http://0.0.0.0:443");
+
+      let blockStream = client.getBlockRange(
+        buildBlockRange(2419904, 2411000),
+        {},
+      );
+
+      blockStream.on("data", function (response) {
+        console.log(response);
+
+        console.log(response.toObject());
+        b(JSON.stringify(response));
+      });
+
+      blockStream.on("status", function (status) {
+        console.log("status code: ", status.code);
+        console.log("details: ", status.details);
+        console.log("metadata: ", status.metadata);
+      });
+
+      blockStream.on("end", function (end) {
+        console.log("stream ended");
+      });
+    },
+    disabled: false,
+  });
+}
 
 function setupBtn(id, { proof, what }) {
   // Assign onclick handler + enable the button.
@@ -51,4 +65,5 @@ function setupBtn(id, { proof, what }) {
 
   await multiThread.initThreadPool(num_concurrency);
   setupBtn("multiThread", multiThread);
+  setupBtnDownload("passval", multiThread);
 })();
