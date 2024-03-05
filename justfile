@@ -49,4 +49,4 @@ generate-pb-js:
 
 # run a local proxy to the lightwalletd server on port 443
 run-proxy:
-    grpcwebproxy --backend_addr=ai.lightwalletd.com:443 --run_tls_server=false --backend_tls --allow_all_origins --server_http_debug_port 443
+    grpcwebproxy  --backend_max_call_recv_msg_size=10485760 --server_http_max_write_timeout=100s --server_http_max_read_timeout=100s --backend_addr=ai.lightwalletd.com:443 --run_tls_server=false --backend_tls --allow_all_origins --server_http_debug_port 443

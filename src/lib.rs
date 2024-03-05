@@ -7,19 +7,20 @@ use orchard::{
     Anchor, Bundle,
 };
 use rand::rngs::OsRng;
+use serde::{Deserialize, Serialize};
 
 use std::convert::TryInto;
 
+use codegen::compact_formats as pb;
+use protobuf::Message;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
-use protobuf::Message;
-use web_sys::console;
+use web_sys::{console, js_sys::Uint8Array};
 use zcash_note_encryption::{batch, try_compact_note_decryption, try_note_decryption};
-use codegen::compact_formats as pb;
 
-mod utils;
 mod codegen;
 mod conversions;
+mod utils;
 
 #[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;
@@ -188,42 +189,125 @@ pub fn what() {
 
 #[wasm_bindgen]
 pub fn b(block_ser: Vec<u8>) {
-    let block =  pb::CompactBlock::parse_from_bytes(&block_ser).unwrap();
+    let block = pb::CompactBlock::parse_from_bytes(&block_ser).unwrap();
 
     console::log_1(&format!("height {:?}", block.height).into());
     console::log_1(&format!("{:?}", block).into());
 }
 
+// #[wasm_bindgen]
+// pub fn batch_trial_decrypt()
+
 #[wasm_bindgen]
 /// Generate a random view key and trial-decrypts all notes in a given block
 /// Each trial decryption is timed and logged to the console
 /// Returns the total number of notes in the block
-pub fn decrypt_all_notes(block_bytes: Vec<u8>) -> u32 {
-    let block =  pb::CompactBlock::parse_from_bytes(&block_bytes).unwrap();
+pub fn decrypt_all_notes(block_bytes: &[u8]) -> u32 {
+    let block = pb::CompactBlock::parse_from_bytes(&block_bytes).unwrap();
 
     let fvk = FullViewingKey::from(&SpendingKey::from_bytes([7; 32]).unwrap());
-    let ivk = PreparedIncomingViewingKey::new(&fvk.to_ivk(Scope::External));
+    let ivk = vec![PreparedIncomingViewingKey::new(
+        &fvk.to_ivk(Scope::External),
+    )];
 
-    let mut note_count = 0;
-
+    let note_count: std::sync::atomic::AtomicU32 = 0.into();
+    let height = block.height;
+    console::log_1(&format!("Decrypting transaction from block: {}", height).into());
     block.vtx.into_iter().for_each(|tx| {
-        tx.actions.into_iter().for_each(|pb_action| {
-            note_count += 1;
+        let compact: Vec<(OrchardDomain, CompactAction)> = tx
+            .actions
+            .into_iter()
+            .map(|pb_action| {
+                let action: CompactAction = pb_action.try_into().unwrap();
+                let domain = OrchardDomain::for_nullifier(action.nullifier());
+                (domain, action)
+            })
+            .collect();
 
-            let compact: CompactAction = pb_action.try_into().unwrap();
-            let domain = OrchardDomain::for_nullifier(compact.nullifier());
+        console::time_with_label(&format!(
+            "Decrypt transaction index {} at block height: {}",
+            tx.index, height
+        ));
+        note_count.fetch_add(compact.len() as u32, std::sync::atomic::Ordering::Relaxed);
+        let results = batch::try_compact_note_decryption(&ivk, &compact);
+        console::time_end_with_label(&format!(
+            "Decrypt transaction index {} at block height: {:?}",
+            tx.index, height
+        ));
 
-            console::time_with_label(&format!("Decrypt {:?}", compact)); // this needs to be unique for each note otherwise it gets confused
-            let result = try_compact_note_decryption(&domain, &ivk, &compact);
-            console::time_end_with_label(&format!("Decrypt {:?}", compact));
-
-            match result {
-                None => console::log_1(&"Note not for this address".into()),
-                Some((note, _recipient)) => console::log_1(&format!("Note: {:?}", note).into()),
-            }
-        });
+        let valid_results = results.into_iter().flatten().collect::<Vec<_>>();
+        if valid_results.is_empty() {
+            console::log_1(&format!("No notes for this address").into());
+        } else {
+            console::log_1(&format!("Notes: {:?}", valid_results).into());
+        }
     });
-    note_count
+    note_count.into_inner()
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct PbVecCompactTx(pub Vec<Vec<u8>>);
+
+#[wasm_bindgen]
+pub fn decrypt_vtx(vtxs: JsValue) -> u32 {
+    let fvk = FullViewingKey::from(&SpendingKey::from_bytes([7; 32]).unwrap());
+    let ivk = vec![PreparedIncomingViewingKey::new(
+        &fvk.to_ivk(Scope::External),
+    )];
+
+    console::time_with_label("Deser VTX");
+    let vtxs: PbVecCompactTx = serde_wasm_bindgen::from_value(vtxs).unwrap();
+    let compact = vtxs
+        .0
+        .into_iter()
+        .map(|tx| pb::CompactTx::parse_from_bytes(&tx).unwrap())
+        .map(|tx| {
+            tx.actions
+                .into_iter()
+                .map(|action| {
+                    let action: CompactAction = action.try_into().unwrap();
+                    let domain = OrchardDomain::for_nullifier(action.nullifier());
+                    (domain, action)
+                })
+                .collect::<Vec<_>>()
+        })
+        .flatten()
+        .collect::<Vec<_>>();
+    console::time_end_with_label("Deser VTX");
+    console::log_1(&format!("Attempting to batch decrypt {} txns", compact.len()).into());
+
+    console::time_with_label(&format!("Decrypting Total {} transactions", compact.len()));
+    let num_parallel = rayon::current_num_threads();
+    console::log_1(&format!("Rayon available parallelism Num Parallel: {}", num_parallel).into());
+    let results = compact
+        .par_chunks(compact.len() / num_parallel)
+        .enumerate()
+        .map(|(i, c)| {
+            console::time_with_label(&format!(
+                "Decrypting chunk {} of {} transactions",
+                i,
+                c.len()
+            ));
+            let r = batch::try_compact_note_decryption(&ivk, c);
+            console::time_end_with_label(&format!(
+                "Decrypting chunk {} of {} transactions",
+                i,
+                c.len()
+            ));
+            r
+        })
+        .flatten()
+        .collect::<Vec<_>>();
+
+    console::time_end_with_label(&format!("Decrypting Total {} transactions", compact.len()));
+
+    let valid_results = results.into_iter().flatten().collect::<Vec<_>>();
+    if valid_results.is_empty() {
+        console::log_1(&format!("No notes for this address").into());
+    } else {
+        console::log_1(&format!("Notes: {:?}", valid_results).into());
+    }
+    compact.len() as u32
 }
 
 #[wasm_bindgen(start)]

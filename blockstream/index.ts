@@ -1,14 +1,14 @@
 import { LwdClient, buildBlockRange } from "./blockstream.js";
-import { CompactBlock } from './generated/compact_formats_pb.ts';
+import { CompactBlock } from "./generated/compact_formats_pb.ts";
 
 let num_concurrency = navigator.hardwareConcurrency;
 console.log("num_concurrency: ", num_concurrency);
 
 const ORCHARD_ACTIVATION = 1687104;
-const START = ORCHARD_ACTIVATION;
-const END = ORCHARD_ACTIVATION+10000;
+const START = ORCHARD_ACTIVATION + 10000;
+const END = ORCHARD_ACTIVATION + 20000;
 
-function setupBtnDownload(id, { decrypt_all_notes }) {
+function setupBtnDownload(id, { decrypt_all_notes, decrypt_vtx }) {
   // Assign onclick handler + enable the button.
   Object.assign(document.getElementById(id), {
     async onclick() {
@@ -18,16 +18,14 @@ function setupBtnDownload(id, { decrypt_all_notes }) {
 
       let client = new LwdClient("http://0.0.0.0:443", null, null);
 
-      let blockStream = client.getBlockRange(
-        buildBlockRange(START, END),
-        {},
-      );
-
+      let blockStream = client.getBlockRange(buildBlockRange(START, END), {});
+      let blocks: Map<number, CompactBlock> = new Map();
       blockStream.on("data", function (response: CompactBlock) {
         // console.log(response.toObject());
         blocksProcessed++;
-        // console.log("blocksProcessed: ", blocksProcessed);
-        notesProcessed += decrypt_all_notes(response.serializeBinary());
+        console.log("blocks downloaded: ", blocksProcessed);
+        blocks.set(response.getHeight(), response);
+        // notesProcessed += decrypt_all_notes(response.serializeBinary());
       });
 
       blockStream.on("status", function (status) {
@@ -37,7 +35,13 @@ function setupBtnDownload(id, { decrypt_all_notes }) {
       });
 
       blockStream.on("end", function (end) {
-        console.log("stream ended");
+        console.log("Download stream ended");
+        let vtx = Array.from(blocks.values())
+          .map((block) => block.getVtxList())
+          .reduce((accumulator, value) => accumulator.concat(value), [])
+          .map((vtx) => vtx.serializeBinary());
+
+        notesProcessed = decrypt_vtx(vtx);
         console.log("notesProcessed: ", notesProcessed);
         console.log("blocksProcessed: ", blocksProcessed);
         console.log("time: ", performance.now() - start);
