@@ -8,7 +8,10 @@ const ORCHARD_ACTIVATION = 1687104;
 const START = ORCHARD_ACTIVATION + 10000;
 const END = ORCHARD_ACTIVATION + 20000;
 
-function setupBtnDownload(id, { decrypt_all_notes, decrypt_vtx }) {
+function setupBtnDownload(
+  id,
+  { decrypt_all_notes, decrypt_vtx_sapling, decrypt_vtx_orchard },
+) {
   // Assign onclick handler + enable the button.
   Object.assign(document.getElementById(id), {
     async onclick() {
@@ -41,7 +44,15 @@ function setupBtnDownload(id, { decrypt_all_notes, decrypt_vtx }) {
           .reduce((accumulator, value) => accumulator.concat(value), [])
           .map((vtx) => vtx.serializeBinary());
 
-        notesProcessed = decrypt_vtx(vtx);
+        if (id === "trialDecryptSapling") {
+          console.log("Button clicked for Sapling trial decrypt");
+          notesProcessed = decrypt_vtx_sapling(vtx);
+        } else if (id === "trialDecryptOrchard") {
+          console.log("Button clicked for Orchard trial decrypt");
+          notesProcessed = decrypt_vtx_orchard(vtx);
+        } else {
+          console.error("Invalid button id");
+        }
         console.log("notesProcessed: ", notesProcessed);
         console.log("blocksProcessed: ", blocksProcessed);
         console.log("time: ", performance.now() - start);
@@ -81,5 +92,6 @@ function setupBtn(id, { proof, what }) {
 
   await multiThread.initThreadPool(num_concurrency);
   setupBtn("multiThread", multiThread);
-  setupBtnDownload("passval", multiThread);
+  setupBtnDownload("trialDecryptOrchard", multiThread);
+  setupBtnDownload("trialDecryptSapling", multiThread);
 })();

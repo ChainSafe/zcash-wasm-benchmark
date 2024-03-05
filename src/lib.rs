@@ -13,15 +13,21 @@ use std::convert::TryInto;
 
 use codegen::compact_formats as pb;
 use protobuf::Message;
+use sapling::{
+    keys::{FullViewingKey as SaplingFullViewingKey, SaplingIvk},
+    note_encryption::{CompactOutputDescription, SaplingDomain, Zip212Enforcement},
+};
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 use web_sys::{console, js_sys::Uint8Array};
-use zcash_note_encryption::{batch, try_compact_note_decryption, try_note_decryption};
-
+use zcash_note_encryption::{
+    batch, try_compact_note_decryption, try_note_decryption, BatchDomain, Domain, ShieldedOutput,
+    COMPACT_NOTE_SIZE,
+};
 mod codegen;
 mod conversions;
 mod utils;
-
+use ff::Field;
 #[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;
 
@@ -195,9 +201,6 @@ pub fn b(block_ser: Vec<u8>) {
     console::log_1(&format!("{:?}", block).into());
 }
 
-// #[wasm_bindgen]
-// pub fn batch_trial_decrypt()
-
 #[wasm_bindgen]
 /// Generate a random view key and trial-decrypts all notes in a given block
 /// Each trial decryption is timed and logged to the console
@@ -245,22 +248,10 @@ pub fn decrypt_all_notes(block_bytes: &[u8]) -> u32 {
     note_count.into_inner()
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-struct PbVecCompactTx(pub Vec<Vec<u8>>);
-
 #[wasm_bindgen]
-pub fn decrypt_vtx(vtxs: JsValue) -> u32 {
-    let fvk = FullViewingKey::from(&SpendingKey::from_bytes([7; 32]).unwrap());
-    let ivk = vec![PreparedIncomingViewingKey::new(
-        &fvk.to_ivk(Scope::External),
-    )];
-
-    console::time_with_label("Deser VTX");
-    let vtxs: PbVecCompactTx = serde_wasm_bindgen::from_value(vtxs).unwrap();
-    let compact = vtxs
-        .0
-        .into_iter()
-        .map(|tx| pb::CompactTx::parse_from_bytes(&tx).unwrap())
+pub fn decrypt_vtx_orchard(vtxs: JsValue) -> u32 {
+    console::time_with_label("Deserializing VTX");
+    let compact = js_value_to_compact_tx(vtxs)
         .map(|tx| {
             tx.actions
                 .into_iter()
@@ -273,24 +264,78 @@ pub fn decrypt_vtx(vtxs: JsValue) -> u32 {
         })
         .flatten()
         .collect::<Vec<_>>();
-    console::time_end_with_label("Deser VTX");
-    console::log_1(&format!("Attempting to batch decrypt {} txns", compact.len()).into());
+    console::time_end_with_label("Deserializing VTX");
 
-    console::time_with_label(&format!("Decrypting Total {} transactions", compact.len()));
+    let ivks = dummy_ivk_orchard(1);
+
+    console::log_1(
+        &format!(
+            "Attempting to batch decrypt {} Orchard txns for {} Viewing keys",
+            compact.len(),
+            ivks.len()
+        )
+        .into(),
+    );
+    decrypt_compact(&ivks, &compact)
+}
+
+#[wasm_bindgen]
+pub fn decrypt_vtx_sapling(vtxs: JsValue) -> u32 {
+    console::time_with_label("Deserializing VTX");
+    let compact = js_value_to_compact_tx(vtxs)
+        .map(|tx| {
+            tx.outputs
+                .into_iter()
+                .map(|output| {
+                    let output: CompactOutputDescription = output.try_into().unwrap();
+                    (SaplingDomain::new(Zip212Enforcement::Off), output)
+                })
+                .collect::<Vec<_>>()
+        })
+        .flatten()
+        .collect::<Vec<_>>();
+    console::time_end_with_label("Deserializing VTX");
+
+    let ivks = dummy_ivk_sapling(1);
+
+    console::log_1(
+        &format!(
+            "Attempting to batch decrypt Sapling {} txns for {} Viewing keys",
+            compact.len(),
+            ivks.len()
+        )
+        .into(),
+    );
+
+    decrypt_compact(ivks.as_slice(), &compact)
+}
+
+fn decrypt_compact<D: BatchDomain, Output: ShieldedOutput<D, COMPACT_NOTE_SIZE>>(
+    ivks: &[D::IncomingViewingKey],
+    compact: &[(D, Output)],
+) -> u32
+where
+    (D, Output): Sync,
+    <D as Domain>::Note: Send + std::fmt::Debug,
+    <D as Domain>::Recipient: Send + std::fmt::Debug,
+    <D as Domain>::IncomingViewingKey: Sync + std::fmt::Debug,
+{
     let num_parallel = rayon::current_num_threads();
     console::log_1(&format!("Rayon available parallelism Num Parallel: {}", num_parallel).into());
+
+    console::time_with_label(&format!("Decrypted Total {} transactions", compact.len()));
     let results = compact
-        .par_chunks(compact.len() / num_parallel)
+        .par_chunks(usize::div_ceil(compact.len(), num_parallel))
         .enumerate()
         .map(|(i, c)| {
             console::time_with_label(&format!(
-                "Decrypting chunk {} of {} transactions",
+                "Decrypted chunk {} of {} transactions",
                 i,
                 c.len()
             ));
-            let r = batch::try_compact_note_decryption(&ivk, c);
+            let r = batch::try_compact_note_decryption(&ivks, c);
             console::time_end_with_label(&format!(
-                "Decrypting chunk {} of {} transactions",
+                "Decrypted chunk {} of {} transactions",
                 i,
                 c.len()
             ));
@@ -299,7 +344,7 @@ pub fn decrypt_vtx(vtxs: JsValue) -> u32 {
         .flatten()
         .collect::<Vec<_>>();
 
-    console::time_end_with_label(&format!("Decrypting Total {} transactions", compact.len()));
+    console::time_end_with_label(&format!("Decrypted Total {} transactions", compact.len()));
 
     let valid_results = results.into_iter().flatten().collect::<Vec<_>>();
     if valid_results.is_empty() {
@@ -308,6 +353,34 @@ pub fn decrypt_vtx(vtxs: JsValue) -> u32 {
         console::log_1(&format!("Notes: {:?}", valid_results).into());
     }
     compact.len() as u32
+}
+
+fn dummy_ivk_sapling(count: usize) -> Vec<sapling::note_encryption::PreparedIncomingViewingKey> {
+    let mut rng = OsRng;
+
+    (1..=count)
+        .map(|_| SaplingIvk(jubjub::Fr::random(&mut rng)))
+        .map(|k| sapling::note_encryption::PreparedIncomingViewingKey::new(&k))
+        .collect::<Vec<_>>()
+}
+
+fn dummy_ivk_orchard(count: usize) -> Vec<PreparedIncomingViewingKey> {
+    (1..=count)
+        .map(|i| {
+            let fvk = FullViewingKey::from(&SpendingKey::from_bytes([i as u8; 32]).unwrap());
+            PreparedIncomingViewingKey::new(&fvk.to_ivk(Scope::External))
+        })
+        .collect::<Vec<_>>()
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct PbVecCompactTx(pub Vec<Vec<u8>>);
+
+fn js_value_to_compact_tx(vtxs: JsValue) -> impl Iterator<Item = pb::CompactTx> {
+    let vtxs: PbVecCompactTx = serde_wasm_bindgen::from_value(vtxs).unwrap();
+    vtxs.0
+        .into_iter()
+        .map(|tx| pb::CompactTx::parse_from_bytes(&tx).unwrap())
 }
 
 #[wasm_bindgen(start)]

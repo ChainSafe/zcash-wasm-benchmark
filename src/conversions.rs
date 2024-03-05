@@ -3,7 +3,7 @@
 use crate::codegen::compact_formats as pb;
 use orchard::note::{ExtractedNoteCommitment, Nullifier};
 use std::convert::TryInto;
-use zcash_note_encryption::EphemeralKeyBytes;
+use zcash_note_encryption::{EphemeralKeyBytes, COMPACT_NOTE_SIZE};
 
 impl std::convert::TryFrom<pb::CompactOrchardAction> for orchard::note_encryption::CompactAction {
     type Error = anyhow::Error;
@@ -22,5 +22,27 @@ impl std::convert::TryFrom<pb::CompactOrchardAction> for orchard::note_encryptio
             ephemeral_key,
             enc_ciphertext_bytes,
         ))
+    }
+}
+
+impl std::convert::TryFrom<pb::CompactSaplingOutput>
+    for sapling::note_encryption::CompactOutputDescription
+{
+    type Error = anyhow::Error;
+
+    fn try_from(pb_output: pb::CompactSaplingOutput) -> Result<Self, Self::Error> {
+        let ephemeral_key_bytes: [u8; 32] = pb_output.ephemeralKey.as_slice().try_into()?;
+        let ephemeral_key = EphemeralKeyBytes::from(ephemeral_key_bytes);
+        let enc_ciphertext: [u8; COMPACT_NOTE_SIZE] = pb_output.ciphertext.as_slice().try_into()?;
+        let cmu = sapling::note::ExtractedNoteCommitment::from_bytes(
+            pb_output.cmu.as_slice().try_into()?,
+        )
+        .unwrap();
+
+        Ok(sapling::note_encryption::CompactOutputDescription {
+            ephemeral_key,
+            cmu,
+            enc_ciphertext,
+        })
     }
 }

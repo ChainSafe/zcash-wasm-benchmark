@@ -38,6 +38,11 @@ serde = { version = "1.0.197", features = ["derive"] }
 protobuf-json-mapping = "3.4.0"
 anyhow = "1.0.80"
 serde-wasm-bindgen = "0.6.5"
+sapling = { package = "sapling-crypto", version = "0.1.1", default-feature = false, features = [
+    "multicore",
+] }
+jubjub = "0.10.0"
+ff = { version = "0.13.0", default-features = false }
 
 
 [dev-dependencies]
