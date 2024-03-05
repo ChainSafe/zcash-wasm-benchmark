@@ -11,16 +11,6 @@
 /* eslint-disable */
 // @ts-nocheck
 
-var jspb = require('google-protobuf');
-var goog = jspb;
-var global =
-    (typeof globalThis !== 'undefined' && globalThis) ||
-    (typeof window !== 'undefined' && window) ||
-    (typeof global !== 'undefined' && global) ||
-    (typeof self !== 'undefined' && self) ||
-    (function () { return this; }).call(null) ||
-    Function('return this')();
-
 goog.exportSymbol('proto.cash.z.wallet.sdk.rpc.ChainMetadata', null, global);
 goog.exportSymbol('proto.cash.z.wallet.sdk.rpc.CompactBlock', null, global);
 goog.exportSymbol('proto.cash.z.wallet.sdk.rpc.CompactOrchardAction', null, global);
@@ -1888,4 +1878,3 @@ proto.cash.z.wallet.sdk.rpc.CompactOrchardAction.prototype.setCiphertext = funct
 };
 
 
-goog.object.extend(exports, proto.cash.z.wallet.sdk.rpc);

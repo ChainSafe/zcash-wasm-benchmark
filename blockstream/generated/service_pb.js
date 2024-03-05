@@ -11,18 +11,6 @@
 /* eslint-disable */
 // @ts-nocheck
 
-var jspb = require('google-protobuf');
-var goog = jspb;
-var global =
-    (typeof globalThis !== 'undefined' && globalThis) ||
-    (typeof window !== 'undefined' && window) ||
-    (typeof global !== 'undefined' && global) ||
-    (typeof self !== 'undefined' && self) ||
-    (function () { return this; }).call(null) ||
-    Function('return this')();
-
-var compact_formats_pb = require('./compact_formats_pb.js');
-goog.object.extend(proto, compact_formats_pb);
 goog.exportSymbol('proto.cash.z.wallet.sdk.rpc.Address', null, global);
 goog.exportSymbol('proto.cash.z.wallet.sdk.rpc.AddressList', null, global);
 goog.exportSymbol('proto.cash.z.wallet.sdk.rpc.Balance', null, global);
@@ -4660,4 +4648,3 @@ proto.cash.z.wallet.sdk.rpc.ShieldedProtocol = {
   ORCHARD: 1
 };
 
-goog.object.extend(exports, proto.cash.z.wallet.sdk.rpc);
