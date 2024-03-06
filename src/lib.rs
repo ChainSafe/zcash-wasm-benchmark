@@ -7,30 +7,28 @@ use orchard::{
     Anchor, Bundle,
 };
 use rand::rngs::OsRng;
-use serde::{Deserialize, Serialize};
 
 use std::convert::TryInto;
 
 use codegen::compact_formats as pb;
+
 use protobuf::Message;
 use sapling::{
-    keys::{FullViewingKey as SaplingFullViewingKey, SaplingIvk},
+    keys::SaplingIvk,
     note_encryption::{CompactOutputDescription, SaplingDomain, Zip212Enforcement},
 };
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
-use web_sys::{console, js_sys::Uint8Array};
-use zcash_note_encryption::{
-    batch, try_compact_note_decryption, try_note_decryption, BatchDomain, Domain, ShieldedOutput,
-    COMPACT_NOTE_SIZE,
-};
-mod codegen;
+use web_sys::console;
+use zcash_note_encryption::{batch, BatchDomain, Domain, ShieldedOutput, COMPACT_NOTE_SIZE};
+pub(crate) mod codegen;
 mod conversions;
 mod utils;
 use ff::Field;
 #[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;
 
+mod protobuf_wasm_bindgen_ctor;
 use rayon::prelude::*;
 
 // The following code is mostly copy pasta of benchmarks from orchard repo: https://github.com/zcash/orchard/blob/main/benches/
@@ -97,108 +95,13 @@ pub fn proof() {
                 .unwrap();
             assert!(bundle.verify_proof(&vk).is_ok());
             console::time_with_label(&format!("Verify Proof with {} recipients", num_recipients));
-            bundle.authorization().proof().verify(&vk, &instances);
+            let _ = bundle.authorization().proof().verify(&vk, &instances);
             console::time_end_with_label(&format!(
                 "Verify Proof with {} recipients",
                 num_recipients
             ));
         }
     }
-}
-
-#[wasm_bindgen]
-pub fn what() {
-    let rng = OsRng;
-
-    console::time_with_label("Create Valid IVK");
-    let fvk = FullViewingKey::from(&SpendingKey::from_bytes([7; 32]).unwrap());
-    let valid_ivk = fvk.to_ivk(Scope::External);
-    let recipient = valid_ivk.address_at(0u32);
-    let valid_ivk = PreparedIncomingViewingKey::new(&valid_ivk);
-    console::time_end_with_label("Create Valid IVK");
-
-    console::time_with_label("Parallel Create Invalid IVKs");
-    let invalid_ivks: Vec<_> = (0u32..10240)
-        .into_par_iter()
-        // .with_min_len(10240/8)
-        .map(|i| {
-            let mut sk = [0; 32];
-            sk[..4].copy_from_slice(&i.to_le_bytes());
-            let fvk = FullViewingKey::from(&SpendingKey::from_bytes(sk).unwrap());
-            PreparedIncomingViewingKey::new(&fvk.to_ivk(Scope::External))
-        })
-        .collect();
-    console::time_end_with_label("Parallel Create Invalid IVKs");
-
-    // Takes a long time...
-    console::time_with_label("Build PK");
-    let pk = ProvingKey::build();
-    console::time_end_with_label("Build PK");
-
-    console::time_with_label("Create Bundle");
-    let bundle = {
-        let mut builder = Builder::new(BundleType::DEFAULT, Anchor::from_bytes([0; 32]).unwrap());
-        // The builder pads to two actions, and shuffles their order. Add two recipients
-        // so the first action is always decryptable.
-        builder
-            .add_output(None, recipient, NoteValue::from_raw(10), None)
-            .unwrap();
-        builder
-            .add_output(None, recipient, NoteValue::from_raw(10), None)
-            .unwrap();
-        let bundle: Bundle<_, i64> = builder.build(rng).unwrap().unwrap().0;
-        bundle
-            .create_proof(&pk, rng)
-            .unwrap()
-            .apply_signatures(rng, [0; 32], &[])
-            .unwrap()
-    };
-    console::time_end_with_label("Create Bundle");
-
-    console::time_with_label("Compact");
-    let action = bundle.actions().first();
-    let domain = OrchardDomain::for_action(action);
-
-    let compact = CompactAction::from(action);
-    console::time_end_with_label("Compact");
-
-    console::time_with_label("Decrypt Valid");
-    try_compact_note_decryption(&domain, &valid_ivk, &compact).unwrap();
-    console::time_end_with_label("Decrypt Valid");
-
-    let ivks = 2;
-    let valid_ivks = vec![valid_ivk; ivks];
-    let actions: Vec<_> = (0..100)
-        .map(|_| (OrchardDomain::for_action(action), action.clone()))
-        .collect();
-    let compact: Vec<_> = (0..100)
-        .map(|_| {
-            (
-                OrchardDomain::for_action(action),
-                CompactAction::from(action),
-            )
-        })
-        .collect();
-
-    for size in [10, 50, 100] {
-        console::time_with_label(&format!("Decrypt Valid {}", size));
-        batch::try_compact_note_decryption(&valid_ivks, &compact[..size]);
-
-        // group.bench_function(BenchmarkId::new("compact-invalid", size), |b| {
-        //     b.iter(|| {
-        //         batch::try_compact_note_decryption(&invalid_ivks[..ivks], &compact[..size])
-        //     })
-        // });
-        console::time_end_with_label(&format!("Decrypt Valid {}", size));
-    }
-}
-
-#[wasm_bindgen]
-pub fn b(block_ser: Vec<u8>) {
-    let block = pb::CompactBlock::parse_from_bytes(&block_ser).unwrap();
-
-    console::log_1(&format!("height {:?}", block.height).into());
-    console::log_1(&format!("{:?}", block).into());
 }
 
 #[wasm_bindgen]
@@ -249,9 +152,10 @@ pub fn decrypt_all_notes(block_bytes: &[u8]) -> u32 {
 }
 
 #[wasm_bindgen]
-pub fn decrypt_vtx_orchard(vtxs: JsValue) -> u32 {
-    console::time_with_label("Deserializing VTX");
-    let compact = js_value_to_compact_tx(vtxs)
+pub fn decrypt_vtx_orchard(vtxs: Vec<pb::CompactTx>) -> u32 {
+    console::time_with_label("Converting VTX");
+    let compact = vtxs
+        .into_iter()
         .map(|tx| {
             tx.actions
                 .into_iter()
@@ -264,8 +168,7 @@ pub fn decrypt_vtx_orchard(vtxs: JsValue) -> u32 {
         })
         .flatten()
         .collect::<Vec<_>>();
-    console::time_end_with_label("Deserializing VTX");
-
+    console::time_end_with_label("Converting VTX");
     let ivks = dummy_ivk_orchard(1);
 
     console::log_1(
@@ -280,9 +183,10 @@ pub fn decrypt_vtx_orchard(vtxs: JsValue) -> u32 {
 }
 
 #[wasm_bindgen]
-pub fn decrypt_vtx_sapling(vtxs: JsValue) -> u32 {
-    console::time_with_label("Deserializing VTX");
-    let compact = js_value_to_compact_tx(vtxs)
+pub fn decrypt_vtx_sapling(vtxs: Vec<pb::CompactTx>) -> u32 {
+    console::time_with_label("Converting VTX");
+    let compact = vtxs
+        .into_iter()
         .map(|tx| {
             tx.outputs
                 .into_iter()
@@ -294,7 +198,7 @@ pub fn decrypt_vtx_sapling(vtxs: JsValue) -> u32 {
         })
         .flatten()
         .collect::<Vec<_>>();
-    console::time_end_with_label("Deserializing VTX");
+    console::time_end_with_label("Converting VTX");
 
     let ivks = dummy_ivk_sapling(1);
 
@@ -371,16 +275,6 @@ fn dummy_ivk_orchard(count: usize) -> Vec<PreparedIncomingViewingKey> {
             PreparedIncomingViewingKey::new(&fvk.to_ivk(Scope::External))
         })
         .collect::<Vec<_>>()
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct PbVecCompactTx(pub Vec<Vec<u8>>);
-
-fn js_value_to_compact_tx(vtxs: JsValue) -> impl Iterator<Item = pb::CompactTx> {
-    let vtxs: PbVecCompactTx = serde_wasm_bindgen::from_value(vtxs).unwrap();
-    vtxs.0
-        .into_iter()
-        .map(|tx| pb::CompactTx::parse_from_bytes(&tx).unwrap())
 }
 
 #[wasm_bindgen(start)]

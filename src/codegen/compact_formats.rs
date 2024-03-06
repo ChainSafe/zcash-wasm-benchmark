@@ -25,6 +25,7 @@
 /// of protobuf runtime.
 const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_3_4_0;
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.ChainMetadata)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct ChainMetadata {
@@ -34,6 +35,7 @@ pub struct ChainMetadata {
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.ChainMetadata.orchardCommitmentTreeSize)
     pub orchardCommitmentTreeSize: u32,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.ChainMetadata.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -165,6 +167,7 @@ impl ::protobuf::reflect::ProtobufValue for ChainMetadata {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.CompactBlock)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct CompactBlock {
@@ -173,19 +176,25 @@ pub struct CompactBlock {
     pub protoVersion: u32,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactBlock.height)
     pub height: u64,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactBlock.hash)
     pub hash: ::std::vec::Vec<u8>,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactBlock.prevHash)
     pub prevHash: ::std::vec::Vec<u8>,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactBlock.time)
     pub time: u32,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactBlock.header)
     pub header: ::std::vec::Vec<u8>,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactBlock.vtx)
     pub vtx: ::std::vec::Vec<CompactTx>,
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactBlock.chainMetadata)
     pub chainMetadata: ::protobuf::MessageField<ChainMetadata>,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.CompactBlock.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -415,23 +424,29 @@ impl ::protobuf::reflect::ProtobufValue for CompactBlock {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.CompactTx)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct CompactTx {
     // message fields
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactTx.index)
     pub index: u64,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactTx.hash)
     pub hash: ::std::vec::Vec<u8>,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactTx.fee)
     pub fee: u32,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactTx.spends)
     pub spends: ::std::vec::Vec<CompactSaplingSpend>,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactTx.outputs)
     pub outputs: ::std::vec::Vec<CompactSaplingOutput>,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactTx.actions)
     pub actions: ::std::vec::Vec<CompactOrchardAction>,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.CompactTx.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -630,13 +645,16 @@ impl ::protobuf::reflect::ProtobufValue for CompactTx {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.CompactSaplingSpend)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct CompactSaplingSpend {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactSaplingSpend.nf)
     pub nf: ::std::vec::Vec<u8>,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.CompactSaplingSpend.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -752,17 +770,22 @@ impl ::protobuf::reflect::ProtobufValue for CompactSaplingSpend {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.CompactSaplingOutput)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct CompactSaplingOutput {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactSaplingOutput.cmu)
     pub cmu: ::std::vec::Vec<u8>,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactSaplingOutput.ephemeralKey)
     pub ephemeralKey: ::std::vec::Vec<u8>,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactSaplingOutput.ciphertext)
     pub ciphertext: ::std::vec::Vec<u8>,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.CompactSaplingOutput.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -910,19 +933,25 @@ impl ::protobuf::reflect::ProtobufValue for CompactSaplingOutput {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.CompactOrchardAction)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct CompactOrchardAction {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactOrchardAction.nullifier)
     pub nullifier: ::std::vec::Vec<u8>,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactOrchardAction.cmx)
     pub cmx: ::std::vec::Vec<u8>,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactOrchardAction.ephemeralKey)
     pub ephemeralKey: ::std::vec::Vec<u8>,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.CompactOrchardAction.ciphertext)
     pub ciphertext: ::std::vec::Vec<u8>,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.CompactOrchardAction.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }

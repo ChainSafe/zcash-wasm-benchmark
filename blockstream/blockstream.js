@@ -22,8 +22,8 @@ blockStream.on('end', function(end) {
 ```
 */
 
-import { CompactTxStreamerClient as LwdClient } from './generated/service_grpc_web_pb.js';
-import { BlockRange, BlockID } from './generated/service_pb.js';
+import { CompactTxStreamerClient as LwdClient } from "./generated/ServiceServiceClientPb";
+import { BlockRange, BlockID } from "./generated/service_pb";
 
 /// Accepts a start and end block height as numbers and returns a BlockRange object
 /// as defined in the protobuf schema. This can be passed directly to LwdClient.getBlockRange
@@ -39,7 +39,7 @@ function buildBlockRange(startBlockHeight, endBlockHeight) {
   blockRange.setStart(start);
   blockRange.setEnd(end);
 
-  return blockRange
+  return blockRange;
 }
 
 export { LwdClient, buildBlockRange };

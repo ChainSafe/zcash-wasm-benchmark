@@ -25,15 +25,18 @@
 /// of protobuf runtime.
 const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_3_4_0;
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.BlockID)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct BlockID {
     // message fields
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.BlockID.height)
     pub height: u64,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.BlockID.hash)
     pub hash: ::std::vec::Vec<u8>,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.BlockID.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -165,15 +168,19 @@ impl ::protobuf::reflect::ProtobufValue for BlockID {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.BlockRange)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct BlockRange {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.BlockRange.start)
     pub start: ::protobuf::MessageField<BlockID>,
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.BlockRange.end)
     pub end: ::protobuf::MessageField<BlockID>,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.BlockRange.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -307,17 +314,21 @@ impl ::protobuf::reflect::ProtobufValue for BlockRange {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.TxFilter)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct TxFilter {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.TxFilter.block)
     pub block: ::protobuf::MessageField<BlockID>,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.TxFilter.index)
     pub index: u64,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.TxFilter.hash)
     pub hash: ::std::vec::Vec<u8>,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.TxFilter.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -466,15 +477,18 @@ impl ::protobuf::reflect::ProtobufValue for TxFilter {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.RawTransaction)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct RawTransaction {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.RawTransaction.data)
     pub data: ::std::vec::Vec<u8>,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.RawTransaction.height)
     pub height: u64,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.RawTransaction.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -606,15 +620,18 @@ impl ::protobuf::reflect::ProtobufValue for RawTransaction {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.SendResponse)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct SendResponse {
     // message fields
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.SendResponse.errorCode)
     pub errorCode: i32,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.SendResponse.errorMessage)
     pub errorMessage: ::std::string::String,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.SendResponse.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -746,10 +763,12 @@ impl ::protobuf::reflect::ProtobufValue for SendResponse {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.ChainSpec)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct ChainSpec {
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.ChainSpec.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -849,10 +868,12 @@ impl ::protobuf::reflect::ProtobufValue for ChainSpec {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.Empty)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct Empty {
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.Empty.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -952,39 +973,51 @@ impl ::protobuf::reflect::ProtobufValue for Empty {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.LightdInfo)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct LightdInfo {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.version)
     pub version: ::std::string::String,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.vendor)
     pub vendor: ::std::string::String,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.taddrSupport)
     pub taddrSupport: bool,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.chainName)
     pub chainName: ::std::string::String,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.saplingActivationHeight)
     pub saplingActivationHeight: u64,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.consensusBranchId)
     pub consensusBranchId: ::std::string::String,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.blockHeight)
     pub blockHeight: u64,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.gitCommit)
     pub gitCommit: ::std::string::String,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.branch)
     pub branch: ::std::string::String,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.buildDate)
     pub buildDate: ::std::string::String,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.buildUser)
     pub buildUser: ::std::string::String,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.estimatedHeight)
     pub estimatedHeight: u64,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.zcashdBuild)
     pub zcashdBuild: ::std::string::String,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.LightdInfo.zcashdSubversion)
     pub zcashdSubversion: ::std::string::String,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.LightdInfo.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -1308,15 +1341,19 @@ impl ::protobuf::reflect::ProtobufValue for LightdInfo {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct TransparentAddressBlockFilter {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter.address)
     pub address: ::std::string::String,
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter.range)
     pub range: ::protobuf::MessageField<BlockRange>,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -1449,6 +1486,7 @@ impl ::protobuf::reflect::ProtobufValue for TransparentAddressBlockFilter {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.Duration)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct Duration {
@@ -1456,6 +1494,7 @@ pub struct Duration {
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.Duration.intervalUs)
     pub intervalUs: i64,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.Duration.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -1571,6 +1610,7 @@ impl ::protobuf::reflect::ProtobufValue for Duration {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.PingResponse)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct PingResponse {
@@ -1580,6 +1620,7 @@ pub struct PingResponse {
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.PingResponse.exit)
     pub exit: i64,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.PingResponse.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -1711,13 +1752,16 @@ impl ::protobuf::reflect::ProtobufValue for PingResponse {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.Address)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct Address {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.Address.address)
     pub address: ::std::string::String,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.Address.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -1833,13 +1877,16 @@ impl ::protobuf::reflect::ProtobufValue for Address {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.AddressList)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct AddressList {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.AddressList.addresses)
     pub addresses: ::std::vec::Vec<::std::string::String>,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.AddressList.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -1955,6 +2002,7 @@ impl ::protobuf::reflect::ProtobufValue for AddressList {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.Balance)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct Balance {
@@ -1962,6 +2010,7 @@ pub struct Balance {
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.Balance.valueZat)
     pub valueZat: i64,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.Balance.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -2077,13 +2126,16 @@ impl ::protobuf::reflect::ProtobufValue for Balance {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.Exclude)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct Exclude {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.Exclude.txid)
     pub txid: ::std::vec::Vec<::std::vec::Vec<u8>>,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.Exclude.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -2199,23 +2251,29 @@ impl ::protobuf::reflect::ProtobufValue for Exclude {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.TreeState)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct TreeState {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.TreeState.network)
     pub network: ::std::string::String,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.TreeState.height)
     pub height: u64,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.TreeState.hash)
     pub hash: ::std::string::String,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.TreeState.time)
     pub time: u32,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.TreeState.saplingTree)
     pub saplingTree: ::std::string::String,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.TreeState.orchardTree)
     pub orchardTree: ::std::string::String,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.TreeState.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -2411,17 +2469,20 @@ impl ::protobuf::reflect::ProtobufValue for TreeState {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.GetSubtreeRootsArg)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct GetSubtreeRootsArg {
     // message fields
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetSubtreeRootsArg.startIndex)
     pub startIndex: u32,
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetSubtreeRootsArg.shieldedProtocol)
     pub shieldedProtocol: ::protobuf::EnumOrUnknown<ShieldedProtocol>,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetSubtreeRootsArg.maxEntries)
     pub maxEntries: u32,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.GetSubtreeRootsArg.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -2569,17 +2630,21 @@ impl ::protobuf::reflect::ProtobufValue for GetSubtreeRootsArg {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.SubtreeRoot)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct SubtreeRoot {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.SubtreeRoot.rootHash)
     pub rootHash: ::std::vec::Vec<u8>,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.SubtreeRoot.completingBlockHash)
     pub completingBlockHash: ::std::vec::Vec<u8>,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.SubtreeRoot.completingBlockHeight)
     pub completingBlockHeight: u64,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.SubtreeRoot.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -2727,10 +2792,12 @@ impl ::protobuf::reflect::ProtobufValue for SubtreeRoot {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.GetAddressUtxosArg)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct GetAddressUtxosArg {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetAddressUtxosArg.addresses)
     pub addresses: ::std::vec::Vec<::std::string::String>,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetAddressUtxosArg.startHeight)
@@ -2738,6 +2805,7 @@ pub struct GetAddressUtxosArg {
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetAddressUtxosArg.maxEntries)
     pub maxEntries: u32,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.GetAddressUtxosArg.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -2885,16 +2953,20 @@ impl ::protobuf::reflect::ProtobufValue for GetAddressUtxosArg {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.GetAddressUtxosReply)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct GetAddressUtxosReply {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetAddressUtxosReply.address)
     pub address: ::std::string::String,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetAddressUtxosReply.txid)
     pub txid: ::std::vec::Vec<u8>,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetAddressUtxosReply.index)
     pub index: i32,
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetAddressUtxosReply.script)
     pub script: ::std::vec::Vec<u8>,
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetAddressUtxosReply.valueZat)
@@ -2902,6 +2974,7 @@ pub struct GetAddressUtxosReply {
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetAddressUtxosReply.height)
     pub height: u64,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.GetAddressUtxosReply.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
@@ -3097,13 +3170,16 @@ impl ::protobuf::reflect::ProtobufValue for GetAddressUtxosReply {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
 }
 
+#[wasm_bindgen::prelude::wasm_bindgen]
 // @@protoc_insertion_point(message:cash.z.wallet.sdk.rpc.GetAddressUtxosReplyList)
 #[derive(PartialEq,Clone,Default,Debug)]
 pub struct GetAddressUtxosReplyList {
     // message fields
+    #[wasm_bindgen::prelude::wasm_bindgen(getter_with_clone)]
     // @@protoc_insertion_point(field:cash.z.wallet.sdk.rpc.GetAddressUtxosReplyList.addressUtxos)
     pub addressUtxos: ::std::vec::Vec<GetAddressUtxosReply>,
     // special fields
+    #[wasm_bindgen::prelude::wasm_bindgen(skip)]
     // @@protoc_insertion_point(special_field:cash.z.wallet.sdk.rpc.GetAddressUtxosReplyList.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
 }
