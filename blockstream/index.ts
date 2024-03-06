@@ -6,12 +6,14 @@ console.log("num_concurrency: ", num_concurrency);
 
 const ORCHARD_ACTIVATION = 1687104;
 const START = ORCHARD_ACTIVATION + 10000;
-const END = ORCHARD_ACTIVATION + 30000;
+const END = ORCHARD_ACTIVATION + 20000;
+
+let blocks: Map<number, CompactBlockPb> = new Map();
 
 function setupBtnDownload(
   id,
   {
-    decrypt_all_notes,
+    decrypt_vtx_both,
     decrypt_vtx_sapling,
     decrypt_vtx_orchard,
     CompactTx,
@@ -30,13 +32,14 @@ function setupBtnDownload(
         console.log("Button clicked for Sapling trial decrypt");
       } else if (id === "trialDecryptOrchard") {
         console.log("Button clicked for Orchard trial decrypt");
+      } else if (id === "trialDecryptBoth") {
+        console.log("Button clicked for both trial decrypt");
       } else {
         console.error("Invalid button id");
       }
       let client = new LwdClient("http://0.0.0.0:443", null, null);
 
       let blockStream = client.getBlockRange(buildBlockRange(START, END), {});
-      let blocks: Map<number, CompactBlockPb> = new Map();
 
       blockStream.on("data", function (response: CompactBlockPb) {
         blocksProcessed++;
@@ -92,16 +95,24 @@ function setupBtnDownload(
           "time to construct wasm passable obj: ",
           performance.now() - start_construction,
         );
-        if (id === "trialDecryptSapling") {
-          console.log("Button clicked for Sapling trial decrypt");
-          notesProcessed = decrypt_vtx_sapling(vtx);
-        } else if (id === "trialDecryptOrchard") {
-          console.log("Button clicked for Orchard trial decrypt");
-
-          notesProcessed = decrypt_vtx_orchard(vtx);
-        } else {
-          console.error("Invalid button id");
+        try {
+          if (id === "trialDecryptSapling") {
+            console.log("Button clicked for Sapling trial decrypt");
+            notesProcessed = decrypt_vtx_sapling(vtx);
+          } else if (id === "trialDecryptOrchard") {
+            console.log("Button clicked for Orchard trial decrypt");
+            notesProcessed = decrypt_vtx_orchard(vtx);
+          } else if (id == "trialDecryptBoth") {
+            console.log("Button clicked for both trial decrypt");
+            notesProcessed = decrypt_vtx_both(vtx);
+          } else {
+            console.error("Invalid button id");
+          }
+        } catch (e) {
+          console.log("o no");
+          console.log(e);
         }
+
         console.log("notesProcessed: ", notesProcessed);
         console.log("blocksProcessed: ", blocksProcessed);
         console.log("time: ", performance.now() - start);
@@ -143,4 +154,5 @@ function setupBtn(id, { proof, what }) {
   setupBtn("multiThread", multiThread);
   setupBtnDownload("trialDecryptOrchard", multiThread);
   setupBtnDownload("trialDecryptSapling", multiThread);
+  setupBtnDownload("trialDecryptBoth", multiThread);
 })();

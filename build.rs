@@ -10,6 +10,7 @@ fn main() {
     impl CustomizeCallback for GenSerde {
         fn message(&self, _message: &MessageDescriptor) -> Customize {
             Customize::default().before("#[wasm_bindgen::prelude::wasm_bindgen]")
+            // Customize::default().before("#[wasm_bindgen::prelude::wasm_bindgen]\n #[repr(C)]")
         }
 
         fn field(&self, field: &FieldDescriptor) -> Customize {

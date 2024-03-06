@@ -10,7 +10,7 @@ use rand::rngs::OsRng;
 
 use std::convert::TryInto;
 
-use codegen::compact_formats as pb;
+use codegen::compact_formats::{self as pb};
 
 use protobuf::Message;
 use sapling::{
@@ -152,13 +152,13 @@ pub fn decrypt_all_notes(block_bytes: &[u8]) -> u32 {
 }
 
 #[wasm_bindgen]
-pub fn decrypt_vtx_orchard(vtxs: Vec<pb::CompactTx>) -> u32 {
+pub fn decrypt_vtx_orchard(vtxs: Box<[pb::CompactTx]>) -> u32 {
     console::time_with_label("Converting VTX");
     let compact = vtxs
         .into_iter()
         .map(|tx| {
             tx.actions
-                .into_iter()
+                .iter()
                 .map(|action| {
                     let action: CompactAction = action.try_into().unwrap();
                     let domain = OrchardDomain::for_nullifier(action.nullifier());
@@ -183,13 +183,13 @@ pub fn decrypt_vtx_orchard(vtxs: Vec<pb::CompactTx>) -> u32 {
 }
 
 #[wasm_bindgen]
-pub fn decrypt_vtx_sapling(vtxs: Vec<pb::CompactTx>) -> u32 {
+pub fn decrypt_vtx_sapling(vtxs: Box<[pb::CompactTx]>) -> u32 {
     console::time_with_label("Converting VTX");
     let compact = vtxs
         .into_iter()
         .map(|tx| {
             tx.outputs
-                .into_iter()
+                .iter()
                 .map(|output| {
                     let output: CompactOutputDescription = output.try_into().unwrap();
                     (SaplingDomain::new(Zip212Enforcement::Off), output)
@@ -197,7 +197,7 @@ pub fn decrypt_vtx_sapling(vtxs: Vec<pb::CompactTx>) -> u32 {
                 .collect::<Vec<_>>()
         })
         .flatten()
-        .collect::<Vec<_>>();
+        .collect::<Box<[_]>>();
     console::time_end_with_label("Converting VTX");
 
     let ivks = dummy_ivk_sapling(1);
@@ -214,12 +214,71 @@ pub fn decrypt_vtx_sapling(vtxs: Vec<pb::CompactTx>) -> u32 {
     decrypt_compact(ivks.as_slice(), &compact)
 }
 
+#[wasm_bindgen]
+pub fn decrypt_vtx_both(vtxs: Box<[pb::CompactTx]>) -> u32 {
+    console::time_with_label("Converting VTX");
+    let (actions, outputs) =
+        vtxs.into_iter()
+            .fold((vec![], vec![]), |(mut actions, mut outputs), tx| {
+                let mut act = tx
+                    .actions
+                    .iter()
+                    .map(|action| {
+                        let action: CompactAction = action.try_into().unwrap();
+                        let domain = OrchardDomain::for_nullifier(action.nullifier());
+                        (domain, action)
+                    })
+                    .collect::<Vec<_>>();
+                let mut opt = tx
+                    .outputs
+                    .iter()
+                    .map(|output| {
+                        let output: CompactOutputDescription = output.try_into().unwrap();
+                        (SaplingDomain::new(Zip212Enforcement::Off), output)
+                    })
+                    .collect::<Vec<_>>();
+                actions.append(&mut act);
+                outputs.append(&mut opt);
+                (actions, outputs)
+            });
+    drop(vtxs);
+    console::time_end_with_label("Converting VTX");
+
+    let ivks = dummy_ivk_sapling(1);
+
+    console::log_1(
+        &format!(
+            "Attempting to batch decrypt Sapling {} txns for {} Viewing keys",
+            outputs.len(),
+            ivks.len()
+        )
+        .into(),
+    );
+
+    let s = decrypt_compact(ivks.as_slice(), &outputs);
+    drop(outputs);
+
+    let ivks = dummy_ivk_orchard(1);
+
+    console::log_1(
+        &format!(
+            "Attempting to batch decrypt {} Orchard txns for {} Viewing keys",
+            actions.len(),
+            ivks.len()
+        )
+        .into(),
+    );
+    let o = decrypt_compact(&ivks, &actions);
+
+    s + o
+}
+
 fn decrypt_compact<D: BatchDomain, Output: ShieldedOutput<D, COMPACT_NOTE_SIZE>>(
     ivks: &[D::IncomingViewingKey],
     compact: &[(D, Output)],
 ) -> u32
 where
-    (D, Output): Sync,
+    (D, Output): Sync + Send,
     <D as Domain>::Note: Send + std::fmt::Debug,
     <D as Domain>::Recipient: Send + std::fmt::Debug,
     <D as Domain>::IncomingViewingKey: Sync + std::fmt::Debug,
