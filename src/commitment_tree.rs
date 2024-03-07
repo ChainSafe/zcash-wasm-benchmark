@@ -11,6 +11,8 @@ use shardtree::ShardTree;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 use zcash_primitives::consensus::BlockHeight;
+use rayon::prelude::*;
+use zcash_client_backend::data_api::SAPLING_SHARD_HEIGHT;
 
 use crate::types::CompactTx;
 
@@ -32,9 +34,9 @@ pub fn batch_insert_mock_data(n_nodes: usize, n_genwitness: usize) {
     let commitments = (0..n_nodes).map(move |i| {
         b[..4].copy_from_slice(&i.to_be_bytes());
         MerkleHashOrchard::from_bytes(&b).unwrap()
-    });
+    }).collect::<Vec<_>>();
 
-    benchmark_tree(commitments, n_genwitness);
+    benchmark_tree(&commitments, n_genwitness);
 }
 
 /// Insert all notes from a batch of transactions into an in-memory commitment tree
@@ -51,9 +53,9 @@ pub fn batch_insert_txn_notes(vtxs: Box<[CompactTx]>, n_genwitness: usize) {
                 })
                 .collect::<Vec<_>>()
         })
-        .map(|cmx| MerkleHashOrchard::from_cmx(&cmx));
+        .map(|cmx| MerkleHashOrchard::from_cmx(&cmx)).collect::<Vec<_>>();
 
-    benchmark_tree(commitments, n_genwitness);
+    benchmark_tree(&commitments, n_genwitness);
 }
 
 /// Run a benchmark of the tree with an iterator of commitments to add.
@@ -61,7 +63,7 @@ pub fn batch_insert_txn_notes(vtxs: Box<[CompactTx]>, n_genwitness: usize) {
 /// and then adds the remainder as ephemeral nodes (ones that will be pruned and just serve to update the witness)
 /// n_genwitness is the number of nodes to mark as needing a witness generated for them
 fn benchmark_tree(
-    commitments: impl Iterator<Item = MerkleHashOrchard> + Clone,
+    commitments: &[MerkleHashOrchard],
     n_genwitness: usize,
 ) {
     let mut tree = OrchardCommitmentTree::new(OrchardMemoryShardStore::empty(), MAX_CHECKPOINTS);
@@ -72,7 +74,7 @@ fn benchmark_tree(
     let _success = tree.checkpoint(0.into()).unwrap();
 
     console::log_1(
-        &format!("Adding {} commitments to tree", commitments.clone().count())
+        &format!("Adding {} commitments to tree", commitments.len())
             .as_str()
             .into(),
     );
@@ -84,19 +86,42 @@ fn benchmark_tree(
 
     // mark the first n_genwitness, the rest as ephemeral
     let ours = commitments
+        .iter()
         .clone()
         .take(n_genwitness)
-        .map(|cmx| (cmx, Retention::Marked));
-    let rest = commitments
-        .skip(n_genwitness)
-        .map(|cmx| (cmx, Retention::<BlockHeight>::Ephemeral));
+        .map(|cmx| (*cmx, Retention::Marked));
+    // let rest = commitments
+    //     .skip(n_genwitness)
+    //     .map(|cmx| (cmx, Retention::<BlockHeight>::Ephemeral));
 
     console::time_with_label("Adding our notes to tree");
     let (last_added, _incomplete) = tree.batch_insert(Position::from(0), ours).unwrap().unwrap();
     console::time_end_with_label("Adding our notes to tree");
 
     console::time_with_label("Updating witnesses with rest");
-    let (_, _incomplete) = tree.batch_insert(last_added + 1, rest).unwrap().unwrap();
+    
+    // Create subtrees from the note commitments in parallel.
+    const CHUNK_SIZE: usize = 1024;
+    let start_position = last_added + 1;
+
+    let subtrees = commitments[n_genwitness..]
+        .par_chunks(CHUNK_SIZE)
+        .enumerate()
+        .filter_map(|(i, chunk)| {
+            let start = start_position + (i * CHUNK_SIZE) as u64;
+            let end = start + chunk.len() as u64;
+
+            shardtree::LocatedTree::from_iter(
+                start..end,
+                SAPLING_SHARD_HEIGHT.into(),
+                chunk.iter().map(|cmx| (*cmx, Retention::<BlockHeight>::Ephemeral)),
+            )
+        })
+        .map(|res| (res.subtree, res.checkpoints))
+        .collect::<Vec<_>>();
+
+
+    // let (_, _incomplete) = tree.batch_insert(last_added + 1, rest).unwrap().unwrap();
     console::time_end_with_label("Updating witnesses with rest");
 
     console::time_with_label("Calculating witness for first added");
