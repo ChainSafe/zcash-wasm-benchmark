@@ -8,11 +8,14 @@ use zcash_note_encryption::{EphemeralKeyBytes, COMPACT_NOTE_SIZE};
 #[allow(dead_code)]
 pub struct CompactTx {
     index: u64,
-    hash: Box<[u8]>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub hash: Box<[u8]>,
     fee: u32,
     spends: Box<[CompactSaplingSpend]>,
-    outputs: Box<[CompactSaplingOutput]>,
-    actions: Box<[CompactOrchardAction]>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub outputs: Box<[CompactSaplingOutput]>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub actions: Box<[CompactOrchardAction]>,
 }
 
 #[wasm_bindgen]
@@ -27,25 +30,14 @@ impl CompactTx {
         actions: Box<[CompactOrchardAction]>,
     ) -> Self {
         assert!(hash.len() == 32);
-        let mut hash_buf = [0; 32];
-        hash_buf.copy_from_slice(hash);
         Self {
             index,
-            hash: Box::from(hash_buf),
+            hash: Box::from(hash),
             fee,
             spends,
             outputs,
             actions,
         }
-    }
-}
-
-impl CompactTx {
-    pub fn actions(&self) -> &[CompactOrchardAction] {
-        &self.actions
-    }
-    pub fn outputs(&self) -> &[CompactSaplingOutput] {
-        &self.outputs
     }
 }
 
@@ -66,8 +58,14 @@ impl CompactSaplingSpend {
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct CompactSaplingOutput {
-    buf: Box<[u8]>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub cmu: Box<[u8]>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub ephemeral_key: Box<[u8]>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub enc_ciphertext: Box<[u8]>,
 }
 
 #[wasm_bindgen]
@@ -77,31 +75,25 @@ impl CompactSaplingOutput {
         assert!(cmu.len() == 32);
         assert!(ephemeral_key.len() == 32);
         assert!(enc_ciphertext.len() == COMPACT_NOTE_SIZE);
-        let mut buf = [0; 32 + 32 + COMPACT_NOTE_SIZE];
-        buf[..32].copy_from_slice(cmu);
-        buf[32..64].copy_from_slice(ephemeral_key);
-        buf[64..].copy_from_slice(enc_ciphertext);
         Self {
-            buf: Box::from(buf),
+            cmu: Box::from(cmu),
+            ephemeral_key: Box::from(ephemeral_key),
+            enc_ciphertext: Box::from(enc_ciphertext),
         }
     }
 }
 
-impl CompactSaplingOutput {
-    pub fn get_cmu(&self) -> &[u8; 32] {
-        self.buf[..32].try_into().unwrap()
-    }
-    pub fn get_ephemeral_key(&self) -> &[u8; 32] {
-        self.buf[32..64].try_into().unwrap()
-    }
-    pub fn get_enc_ciphertext(&self) -> &[u8; COMPACT_NOTE_SIZE] {
-        self.buf[64..].try_into().unwrap()
-    }
-}
-
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct CompactOrchardAction {
-    buf: Box<[u8]>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub nullifier: Box<[u8]>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub cmx: Box<[u8]>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub ephemeral_key: Box<[u8]>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub enc_ciphertext: Box<[u8]>,
 }
 
 #[wasm_bindgen]
@@ -112,29 +104,13 @@ impl CompactOrchardAction {
         assert!(cmx.len() == 32);
         assert!(ephemeral_key.len() == 32);
         assert!(enc_ciphertext.len() == COMPACT_NOTE_SIZE);
-        let mut buf = [0; 32 + 32 + 32 + COMPACT_NOTE_SIZE];
-        buf[..32].copy_from_slice(nullifier);
-        buf[32..64].copy_from_slice(cmx);
-        buf[64..96].copy_from_slice(ephemeral_key);
-        buf[96..].copy_from_slice(enc_ciphertext);
-        Self {
-            buf: Box::from(buf),
-        }
-    }
-}
 
-impl CompactOrchardAction {
-    pub fn get_nullifier(&self) -> &[u8; 32] {
-        self.buf[..32].try_into().unwrap()
-    }
-    pub fn get_cmx(&self) -> &[u8; 32] {
-        self.buf[32..64].try_into().unwrap()
-    }
-    pub fn get_ephemeral_key(&self) -> &[u8; 32] {
-        self.buf[64..96].try_into().unwrap()
-    }
-    pub fn get_enc_ciphertext(&self) -> &[u8; COMPACT_NOTE_SIZE] {
-        self.buf[96..].try_into().unwrap()
+        Self {
+            nullifier: Box::from(nullifier),
+            cmx: Box::from(cmx),
+            ephemeral_key: Box::from(ephemeral_key),
+            enc_ciphertext: Box::from(enc_ciphertext),
+        }
     }
 }
 
@@ -143,10 +119,12 @@ impl TryFrom<CompactOrchardAction> for orchard::note_encryption::CompactAction {
     type Error = anyhow::Error;
 
     fn try_from(action: CompactOrchardAction) -> anyhow::Result<Self> {
-        let nullifier = Nullifier::from_bytes(action.get_nullifier()).unwrap();
-        let cmx = ExtractedNoteCommitment::from_bytes(action.get_cmx()).unwrap();
-        let ephemeral_key = EphemeralKeyBytes::from(*action.get_ephemeral_key());
-        let enc_ciphertext_bytes: [u8; COMPACT_NOTE_SIZE] = *action.get_enc_ciphertext();
+        let nullifier = Nullifier::from_bytes(action.nullifier.as_ref().try_into()?).unwrap();
+        let cmx = ExtractedNoteCommitment::from_bytes(action.cmx.as_ref().try_into()?).unwrap();
+        let ephemeral_key_bytes: [u8; 32] = action.ephemeral_key.as_ref().try_into()?;
+        let ephemeral_key = EphemeralKeyBytes::from(ephemeral_key_bytes);
+        let enc_ciphertext_bytes: [u8; COMPACT_NOTE_SIZE] =
+            action.enc_ciphertext.as_ref().try_into()?;
 
         Ok(orchard::note_encryption::CompactAction::from_parts(
             nullifier,
@@ -161,10 +139,12 @@ impl TryFrom<&CompactOrchardAction> for orchard::note_encryption::CompactAction 
     type Error = anyhow::Error;
 
     fn try_from(action: &CompactOrchardAction) -> anyhow::Result<Self> {
-        let nullifier = Nullifier::from_bytes(action.get_nullifier()).unwrap();
-        let cmx = ExtractedNoteCommitment::from_bytes(action.get_cmx()).unwrap();
-        let ephemeral_key = EphemeralKeyBytes::from(*action.get_ephemeral_key());
-        let enc_ciphertext_bytes: [u8; COMPACT_NOTE_SIZE] = *action.get_enc_ciphertext();
+        let nullifier = Nullifier::from_bytes(action.nullifier.as_ref().try_into()?).unwrap();
+        let cmx = ExtractedNoteCommitment::from_bytes(action.cmx.as_ref().try_into()?).unwrap();
+        let ephemeral_key_bytes: [u8; 32] = action.ephemeral_key.as_ref().try_into()?;
+        let ephemeral_key = EphemeralKeyBytes::from(ephemeral_key_bytes);
+        let enc_ciphertext_bytes: [u8; COMPACT_NOTE_SIZE] =
+            action.enc_ciphertext.as_ref().try_into()?;
 
         Ok(orchard::note_encryption::CompactAction::from_parts(
             nullifier,
@@ -174,14 +154,16 @@ impl TryFrom<&CompactOrchardAction> for orchard::note_encryption::CompactAction 
         ))
     }
 }
-
 impl TryFrom<CompactSaplingOutput> for sapling::note_encryption::CompactOutputDescription {
     type Error = anyhow::Error;
 
     fn try_from(output: CompactSaplingOutput) -> Result<Self, Self::Error> {
-        let ephemeral_key = EphemeralKeyBytes::from(*output.get_ephemeral_key());
-        let enc_ciphertext: [u8; COMPACT_NOTE_SIZE] = *output.get_enc_ciphertext();
-        let cmu = sapling::note::ExtractedNoteCommitment::from_bytes(output.get_cmu()).unwrap();
+        let ephemeral_key_bytes: [u8; 32] = output.ephemeral_key.as_ref().try_into()?;
+        let ephemeral_key = EphemeralKeyBytes::from(ephemeral_key_bytes);
+        let enc_ciphertext: [u8; COMPACT_NOTE_SIZE] = output.enc_ciphertext.as_ref().try_into()?;
+        let cmu =
+            sapling::note::ExtractedNoteCommitment::from_bytes(output.cmu.as_ref().try_into()?)
+                .unwrap();
 
         Ok(sapling::note_encryption::CompactOutputDescription {
             ephemeral_key,
@@ -195,9 +177,12 @@ impl TryFrom<&CompactSaplingOutput> for sapling::note_encryption::CompactOutputD
     type Error = anyhow::Error;
 
     fn try_from(output: &CompactSaplingOutput) -> Result<Self, Self::Error> {
-        let ephemeral_key = EphemeralKeyBytes::from(*output.get_ephemeral_key());
-        let enc_ciphertext: [u8; COMPACT_NOTE_SIZE] = *output.get_enc_ciphertext();
-        let cmu = sapling::note::ExtractedNoteCommitment::from_bytes(output.get_cmu()).unwrap();
+        let ephemeral_key_bytes: [u8; 32] = output.ephemeral_key.as_ref().try_into()?;
+        let ephemeral_key = EphemeralKeyBytes::from(ephemeral_key_bytes);
+        let enc_ciphertext: [u8; COMPACT_NOTE_SIZE] = output.enc_ciphertext.as_ref().try_into()?;
+        let cmu =
+            sapling::note::ExtractedNoteCommitment::from_bytes(output.cmu.as_ref().try_into()?)
+                .unwrap();
 
         Ok(sapling::note_encryption::CompactOutputDescription {
             ephemeral_key,

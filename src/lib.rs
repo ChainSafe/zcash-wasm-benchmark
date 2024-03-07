@@ -107,7 +107,7 @@ pub fn decrypt_vtx_orchard(vtxs: Box<[CompactTx]>) -> u32 {
     let compact = vtxs
         .into_iter()
         .map(|tx| {
-            tx.actions()
+            tx.actions
                 .iter()
                 .map(|action| {
                     let action: CompactAction = action.try_into().unwrap();
@@ -138,7 +138,7 @@ pub fn decrypt_vtx_sapling(vtxs: Box<[CompactTx]>) -> u32 {
     let compact = vtxs
         .into_iter()
         .map(|tx| {
-            tx.outputs()
+            tx.outputs
                 .iter()
                 .map(|output| {
                     let output: CompactOutputDescription = output.try_into().unwrap();
@@ -171,7 +171,7 @@ pub fn decrypt_vtx_both(vtxs: Box<[CompactTx]>) -> u32 {
         vtxs.into_iter()
             .fold((vec![], vec![]), |(mut actions, mut outputs), tx| {
                 let mut act = tx
-                    .actions()
+                    .actions
                     .iter()
                     .map(|action| {
                         let action: CompactAction = action.try_into().unwrap();
@@ -180,7 +180,7 @@ pub fn decrypt_vtx_both(vtxs: Box<[CompactTx]>) -> u32 {
                     })
                     .collect::<Vec<_>>();
                 let mut opt = tx
-                    .outputs()
+                    .outputs
                     .iter()
                     .map(|output| {
                         let output: CompactOutputDescription = output.try_into().unwrap();
