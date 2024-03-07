@@ -10,9 +10,6 @@ use rand::rngs::OsRng;
 
 use std::convert::TryInto;
 
-use codegen::compact_formats::{self as pb};
-
-use protobuf::Message;
 use sapling::{
     keys::SaplingIvk,
     note_encryption::{CompactOutputDescription, SaplingDomain, Zip212Enforcement},
@@ -21,14 +18,14 @@ use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 use zcash_note_encryption::{batch, BatchDomain, Domain, ShieldedOutput, COMPACT_NOTE_SIZE};
-pub(crate) mod codegen;
-mod conversions;
+pub mod types;
 mod utils;
 use ff::Field;
+use types::*;
+
 #[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;
 
-mod protobuf_wasm_bindgen_ctor;
 use rayon::prelude::*;
 
 // The following code is mostly copy pasta of benchmarks from orchard repo: https://github.com/zcash/orchard/blob/main/benches/
@@ -105,59 +102,12 @@ pub fn proof() {
 }
 
 #[wasm_bindgen]
-/// Generate a random view key and trial-decrypts all notes in a given block
-/// Each trial decryption is timed and logged to the console
-/// Returns the total number of notes in the block
-pub fn decrypt_all_notes(block_bytes: &[u8]) -> u32 {
-    let block = pb::CompactBlock::parse_from_bytes(&block_bytes).unwrap();
-
-    let fvk = FullViewingKey::from(&SpendingKey::from_bytes([7; 32]).unwrap());
-    let ivk = vec![PreparedIncomingViewingKey::new(
-        &fvk.to_ivk(Scope::External),
-    )];
-
-    let note_count: std::sync::atomic::AtomicU32 = 0.into();
-    let height = block.height;
-    console::log_1(&format!("Decrypting transaction from block: {}", height).into());
-    block.vtx.into_iter().for_each(|tx| {
-        let compact: Vec<(OrchardDomain, CompactAction)> = tx
-            .actions
-            .into_iter()
-            .map(|pb_action| {
-                let action: CompactAction = pb_action.try_into().unwrap();
-                let domain = OrchardDomain::for_nullifier(action.nullifier());
-                (domain, action)
-            })
-            .collect();
-
-        console::time_with_label(&format!(
-            "Decrypt transaction index {} at block height: {}",
-            tx.index, height
-        ));
-        note_count.fetch_add(compact.len() as u32, std::sync::atomic::Ordering::Relaxed);
-        let results = batch::try_compact_note_decryption(&ivk, &compact);
-        console::time_end_with_label(&format!(
-            "Decrypt transaction index {} at block height: {:?}",
-            tx.index, height
-        ));
-
-        let valid_results = results.into_iter().flatten().collect::<Vec<_>>();
-        if valid_results.is_empty() {
-            console::log_1(&format!("No notes for this address").into());
-        } else {
-            console::log_1(&format!("Notes: {:?}", valid_results).into());
-        }
-    });
-    note_count.into_inner()
-}
-
-#[wasm_bindgen]
-pub fn decrypt_vtx_orchard(vtxs: Box<[pb::CompactTx]>) -> u32 {
+pub fn decrypt_vtx_orchard(vtxs: Box<[CompactTx]>) -> u32 {
     console::time_with_label("Converting VTX");
     let compact = vtxs
         .into_iter()
         .map(|tx| {
-            tx.actions
+            tx.actions()
                 .iter()
                 .map(|action| {
                     let action: CompactAction = action.try_into().unwrap();
@@ -183,12 +133,12 @@ pub fn decrypt_vtx_orchard(vtxs: Box<[pb::CompactTx]>) -> u32 {
 }
 
 #[wasm_bindgen]
-pub fn decrypt_vtx_sapling(vtxs: Box<[pb::CompactTx]>) -> u32 {
+pub fn decrypt_vtx_sapling(vtxs: Box<[CompactTx]>) -> u32 {
     console::time_with_label("Converting VTX");
     let compact = vtxs
         .into_iter()
         .map(|tx| {
-            tx.outputs
+            tx.outputs()
                 .iter()
                 .map(|output| {
                     let output: CompactOutputDescription = output.try_into().unwrap();
@@ -215,13 +165,13 @@ pub fn decrypt_vtx_sapling(vtxs: Box<[pb::CompactTx]>) -> u32 {
 }
 
 #[wasm_bindgen]
-pub fn decrypt_vtx_both(vtxs: Box<[pb::CompactTx]>) -> u32 {
+pub fn decrypt_vtx_both(vtxs: Box<[CompactTx]>) -> u32 {
     console::time_with_label("Converting VTX");
     let (actions, outputs) =
         vtxs.into_iter()
             .fold((vec![], vec![]), |(mut actions, mut outputs), tx| {
                 let mut act = tx
-                    .actions
+                    .actions()
                     .iter()
                     .map(|action| {
                         let action: CompactAction = action.try_into().unwrap();
@@ -230,7 +180,7 @@ pub fn decrypt_vtx_both(vtxs: Box<[pb::CompactTx]>) -> u32 {
                     })
                     .collect::<Vec<_>>();
                 let mut opt = tx
-                    .outputs
+                    .outputs()
                     .iter()
                     .map(|output| {
                         let output: CompactOutputDescription = output.try_into().unwrap();
