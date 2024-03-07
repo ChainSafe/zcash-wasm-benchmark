@@ -1,5 +1,5 @@
-import { LwdClient, buildBlockRange } from "./blockstream.js";
-import { CompactBlock } from "./generated/compact_formats_pb.ts";
+import { LwdClient, buildBlockRange } from "./blockstream";
+import { CompactBlock as CompactBlockPb } from "./generated/compact_formats_pb";
 
 let num_concurrency = navigator.hardwareConcurrency;
 console.log("num_concurrency: ", num_concurrency);
@@ -8,9 +8,19 @@ const ORCHARD_ACTIVATION = 1687104;
 const START = ORCHARD_ACTIVATION + 10000;
 const END = ORCHARD_ACTIVATION + 20000;
 
+let blocks: Map<number, CompactBlockPb> = new Map();
+
 function setupBtnDownload(
   id,
-  { decrypt_all_notes, decrypt_vtx_sapling, decrypt_vtx_orchard },
+  {
+    decrypt_vtx_both,
+    decrypt_vtx_sapling,
+    decrypt_vtx_orchard,
+    CompactTx,
+    CompactOrchardAction,
+    CompactSaplingOutput,
+    CompactSaplingSpend,
+  },
 ) {
   // Assign onclick handler + enable the button.
   Object.assign(document.getElementById(id), {
@@ -18,17 +28,25 @@ function setupBtnDownload(
       let blocksProcessed = 0;
       let notesProcessed = 0;
       let start = performance.now();
-
+      if (id === "trialDecryptSapling") {
+        console.log("Button clicked for Sapling trial decrypt");
+      } else if (id === "trialDecryptOrchard") {
+        console.log("Button clicked for Orchard trial decrypt");
+      } else if (id === "trialDecryptBoth") {
+        console.log("Button clicked for both trial decrypt");
+      } else {
+        console.error("Invalid button id");
+      }
       let client = new LwdClient("http://0.0.0.0:443", null, null);
 
       let blockStream = client.getBlockRange(buildBlockRange(START, END), {});
-      let blocks: Map<number, CompactBlock> = new Map();
-      blockStream.on("data", function (response: CompactBlock) {
-        // console.log(response.toObject());
+
+      blockStream.on("data", function (response: CompactBlockPb) {
         blocksProcessed++;
-        console.log("blocks downloaded: ", blocksProcessed);
+        if (blocksProcessed % 2000 === 0) {
+          console.log("blocks downloaded: ", blocksProcessed);
+        }
         blocks.set(response.getHeight(), response);
-        // notesProcessed += decrypt_all_notes(response.serializeBinary());
       });
 
       blockStream.on("status", function (status) {
@@ -38,21 +56,63 @@ function setupBtnDownload(
       });
 
       blockStream.on("end", function (end) {
-        console.log("Download stream ended");
+        console.log("Download stream ended after: ", performance.now() - start);
+
+        let start_construction = performance.now();
         let vtx = Array.from(blocks.values())
           .map((block) => block.getVtxList())
           .reduce((accumulator, value) => accumulator.concat(value), [])
-          .map((vtx) => vtx.serializeBinary());
-
-        if (id === "trialDecryptSapling") {
-          console.log("Button clicked for Sapling trial decrypt");
-          notesProcessed = decrypt_vtx_sapling(vtx);
-        } else if (id === "trialDecryptOrchard") {
-          console.log("Button clicked for Orchard trial decrypt");
-          notesProcessed = decrypt_vtx_orchard(vtx);
-        } else {
-          console.error("Invalid button id");
+          .map((tx) => {
+            let actions = tx.getActionsList().map((act) => {
+              return new CompactOrchardAction(
+                act.getNullifier_asU8(),
+                act.getCmx_asU8(),
+                act.getEphemeralkey_asU8(),
+                act.getCiphertext_asU8(),
+              );
+            });
+            let outputs = tx.getOutputsList().map((out) => {
+              return new CompactSaplingOutput(
+                out.getCmu_asU8(),
+                out.getEphemeralkey_asU8(),
+                out.getCiphertext_asU8(),
+              );
+            });
+            let spends = tx.getSpendsList().map((spend) => {
+              return new CompactSaplingSpend(spend.getNf_asU8());
+            });
+            let ret = new CompactTx(
+              BigInt(tx.getIndex()),
+              tx.getHash_asU8(),
+              tx.getFee(),
+              spends,
+              outputs,
+              actions,
+            );
+            return ret;
+          });
+        console.log(
+          "time to construct wasm passable obj: ",
+          performance.now() - start_construction,
+        );
+        try {
+          if (id === "trialDecryptSapling") {
+            console.log("Button clicked for Sapling trial decrypt");
+            notesProcessed = decrypt_vtx_sapling(vtx);
+          } else if (id === "trialDecryptOrchard") {
+            console.log("Button clicked for Orchard trial decrypt");
+            notesProcessed = decrypt_vtx_orchard(vtx);
+          } else if (id == "trialDecryptBoth") {
+            console.log("Button clicked for both trial decrypt");
+            notesProcessed = decrypt_vtx_both(vtx);
+          } else {
+            console.error("Invalid button id");
+          }
+        } catch (e) {
+          console.log("o no");
+          console.log(e);
         }
+
         console.log("notesProcessed: ", notesProcessed);
         console.log("blocksProcessed: ", blocksProcessed);
         console.log("time: ", performance.now() - start);
@@ -94,4 +154,5 @@ function setupBtn(id, { proof, what }) {
   setupBtn("multiThread", multiThread);
   setupBtnDownload("trialDecryptOrchard", multiThread);
   setupBtnDownload("trialDecryptSapling", multiThread);
+  setupBtnDownload("trialDecryptBoth", multiThread);
 })();
