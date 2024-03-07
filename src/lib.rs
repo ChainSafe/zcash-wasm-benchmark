@@ -55,7 +55,7 @@ pub async fn stream() {
     let resp = client.getBlockRange(range, JsValue::null());
     console::log_1(&format!("Locked: {}", resp.locked()).into());
     console::log_1(&resp);
-    let body = wasm_streams::ReadableStream::from_raw(resp);
+    let mut body = wasm_streams::ReadableStream::from_raw(resp);
     console::log_1(&format!("wasm stream locked {}", body.is_locked()).into());
     let mut reader = body.get_reader();
     // Convert the JS ReadableStream to a Rust stream
