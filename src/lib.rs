@@ -1,6 +1,7 @@
 use wasm_bindgen::prelude::*;
 
 mod commitment_tree;
+mod proof_gen;
 mod trial_decryption;
 mod types;
 use futures_util::StreamExt;
@@ -56,7 +57,7 @@ pub async fn stream() {
     console::log_1(&resp);
     let body = wasm_streams::ReadableStream::from_raw(resp);
     console::log_1(&format!("wasm stream locked {}", body.is_locked()).into());
-
+    let mut reader = body.get_reader();
     // Convert the JS ReadableStream to a Rust stream
 }
 
