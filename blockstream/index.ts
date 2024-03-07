@@ -96,12 +96,12 @@ function setupBtnDownload(
   });
 }
 
-function setupBtn(id, { proof, what }) {
+function setupBtn(id, f) {
   // Assign onclick handler + enable the button.
   Object.assign(document.getElementById(id), {
     async onclick() {
       const start = performance.now();
-      proof();
+      f();
       const time = performance.now() - start;
 
       console.log(`${time.toFixed(2)} ms`);
@@ -115,7 +115,7 @@ function setupBtn(id, { proof, what }) {
     "./wasm-pkg/serial/zcash_wasm_benchmark.js"
   );
   await singleThread.default();
-  setupBtn("singleThread", singleThread);
+  setupBtn("singleThread", singleThread.proof);
 })();
 
 (async function initMultiThread() {
@@ -125,9 +125,10 @@ function setupBtn(id, { proof, what }) {
   await multiThread.default();
 
   await multiThread.initThreadPool(num_concurrency);
-  setupBtn("multiThread", multiThread);
+  setupBtn("multiThread", multiThread.proof);
+  setupBtn("treeBench", () => multiThread.batch_insert_mock_data(100000, 100));
   setupBtnDownload("trialDecryptOrchard", multiThread.decrypt_vtx_orchard, multiThread);
   setupBtnDownload("trialDecryptSapling", multiThread.decrypt_vtx_sapling, multiThread);
   setupBtnDownload("trialDecryptBoth", multiThread.decrypt_vtx_both, multiThread);
-  setupBtnDownload("treeBench", multiThread.batch_insert_txn_notes, multiThread);
+  setupBtnDownload("treeBenchBlocks", (txns) => multiThread.batch_insert_txn_notes(txns, 1), multiThread);
 })();
