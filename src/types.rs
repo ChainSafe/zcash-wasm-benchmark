@@ -51,7 +51,6 @@ impl CompactTx {
 
 #[wasm_bindgen]
 #[allow(dead_code)]
-
 pub struct CompactSaplingSpend {
     nf: Box<[u8]>,
 }
@@ -68,9 +67,6 @@ impl CompactSaplingSpend {
 
 #[wasm_bindgen]
 pub struct CompactSaplingOutput {
-    // pub ephemeral_key: EphemeralKeyBytes,
-    // pub cmu: ExtractedNoteCommitment,
-    // pub enc_ciphertext: [u8; COMPACT_NOTE_SIZE]
     buf: Box<[u8]>,
 }
 
@@ -105,10 +101,6 @@ impl CompactSaplingOutput {
 
 #[wasm_bindgen]
 pub struct CompactOrchardAction {
-    // nullifier: Nullifier,
-    // cmx: ExtractedNoteCommitment,
-    // ephemeral_key: EphemeralKeyBytes,
-    // enc_ciphertext: [u8; 52],
     buf: Box<[u8]>,
 }
 
@@ -154,7 +146,7 @@ impl TryFrom<CompactOrchardAction> for orchard::note_encryption::CompactAction {
         let nullifier = Nullifier::from_bytes(action.get_nullifier()).unwrap();
         let cmx = ExtractedNoteCommitment::from_bytes(action.get_cmx()).unwrap();
         let ephemeral_key = EphemeralKeyBytes::from(*action.get_ephemeral_key());
-        let enc_ciphertext_bytes: [u8; 52] = *action.get_enc_ciphertext();
+        let enc_ciphertext_bytes: [u8; COMPACT_NOTE_SIZE] = *action.get_enc_ciphertext();
 
         Ok(orchard::note_encryption::CompactAction::from_parts(
             nullifier,
@@ -172,7 +164,7 @@ impl TryFrom<&CompactOrchardAction> for orchard::note_encryption::CompactAction 
         let nullifier = Nullifier::from_bytes(action.get_nullifier()).unwrap();
         let cmx = ExtractedNoteCommitment::from_bytes(action.get_cmx()).unwrap();
         let ephemeral_key = EphemeralKeyBytes::from(*action.get_ephemeral_key());
-        let enc_ciphertext_bytes: [u8; 52] = *action.get_enc_ciphertext();
+        let enc_ciphertext_bytes: [u8; COMPACT_NOTE_SIZE] = *action.get_enc_ciphertext();
 
         Ok(orchard::note_encryption::CompactAction::from_parts(
             nullifier,

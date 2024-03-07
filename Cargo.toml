@@ -36,7 +36,7 @@ wasm-bindgen-futures = "0.4.41"
 serde = { version = "1.0.197", features = ["derive"] }
 anyhow = "1.0.80"
 serde-wasm-bindgen = "0.6.5"
-sapling = { package = "sapling-crypto", version = "0.1.1", default-feature = false, features = [
+sapling = { package = "sapling-crypto", version = "0.1.1", default-features = false, features = [
     "multicore",
 ] }
 jubjub = "0.10.0"
