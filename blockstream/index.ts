@@ -6,21 +6,14 @@ console.log("num_concurrency: ", num_concurrency);
 
 const ORCHARD_ACTIVATION = 1687104;
 const START = ORCHARD_ACTIVATION + 10000;
-const END = ORCHARD_ACTIVATION + 20000;
+const END = START + 10000;
 
 let blocks: Map<number, CompactBlockPb> = new Map();
 
 function setupBtnDownload(
   id,
-  {
-    decrypt_vtx_both,
-    decrypt_vtx_sapling,
-    decrypt_vtx_orchard,
-    CompactTx,
-    CompactOrchardAction,
-    CompactSaplingOutput,
-    CompactSaplingSpend,
-  },
+  withTransactions, // callback to call with the downloaded transactions extracted from the blocks
+  { CompactOrchardAction, CompactSaplingOutput, CompactSaplingSpend, CompactTx } // wasm lib to load constructors from
 ) {
   // Assign onclick handler + enable the button.
   Object.assign(document.getElementById(id), {
@@ -28,15 +21,7 @@ function setupBtnDownload(
       let blocksProcessed = 0;
       let notesProcessed = 0;
       let start = performance.now();
-      if (id === "trialDecryptSapling") {
-        console.log("Button clicked for Sapling trial decrypt");
-      } else if (id === "trialDecryptOrchard") {
-        console.log("Button clicked for Orchard trial decrypt");
-      } else if (id === "trialDecryptBoth") {
-        console.log("Button clicked for both trial decrypt");
-      } else {
-        console.error("Invalid button id");
-      }
+
       let client = new LwdClient("http://0.0.0.0:443", null, null);
 
       let blockStream = client.getBlockRange(buildBlockRange(START, END), {});
@@ -96,24 +81,13 @@ function setupBtnDownload(
           performance.now() - start_construction,
         );
         try {
-          if (id === "trialDecryptSapling") {
-            console.log("Button clicked for Sapling trial decrypt");
-            notesProcessed = decrypt_vtx_sapling(vtx);
-          } else if (id === "trialDecryptOrchard") {
-            console.log("Button clicked for Orchard trial decrypt");
-            notesProcessed = decrypt_vtx_orchard(vtx);
-          } else if (id == "trialDecryptBoth") {
-            console.log("Button clicked for both trial decrypt");
-            notesProcessed = decrypt_vtx_both(vtx);
-          } else {
-            console.error("Invalid button id");
-          }
+          let result = withTransactions(vtx);
+          console.log("result: ", result);
         } catch (e) {
-          console.log("o no");
+          console.log("ourrr nourrr");
           console.log(e);
         }
 
-        console.log("notesProcessed: ", notesProcessed);
         console.log("blocksProcessed: ", blocksProcessed);
         console.log("time: ", performance.now() - start);
       });
@@ -122,12 +96,12 @@ function setupBtnDownload(
   });
 }
 
-function setupBtn(id, { proof, what }) {
+function setupBtn(id, f) {
   // Assign onclick handler + enable the button.
   Object.assign(document.getElementById(id), {
     async onclick() {
       const start = performance.now();
-      proof();
+      f();
       const time = performance.now() - start;
 
       console.log(`${time.toFixed(2)} ms`);
@@ -141,7 +115,7 @@ function setupBtn(id, { proof, what }) {
     "./wasm-pkg/serial/zcash_wasm_benchmark.js"
   );
   await singleThread.default();
-  setupBtn("singleThread", singleThread);
+  setupBtn("singleThread", singleThread.proof);
 })();
 
 (async function initMultiThread() {
@@ -151,8 +125,10 @@ function setupBtn(id, { proof, what }) {
   await multiThread.default();
 
   await multiThread.initThreadPool(num_concurrency);
-  setupBtn("multiThread", multiThread);
-  setupBtnDownload("trialDecryptOrchard", multiThread);
-  setupBtnDownload("trialDecryptSapling", multiThread);
-  setupBtnDownload("trialDecryptBoth", multiThread);
+  setupBtn("multiThread", multiThread.proof);
+  setupBtn("treeBench", () => multiThread.batch_insert_mock_data(100000, 100));
+  setupBtnDownload("trialDecryptOrchard", multiThread.decrypt_vtx_orchard, multiThread);
+  setupBtnDownload("trialDecryptSapling", multiThread.decrypt_vtx_sapling, multiThread);
+  setupBtnDownload("trialDecryptBoth", multiThread.decrypt_vtx_both, multiThread);
+  setupBtnDownload("treeBenchBlocks", (txns) => multiThread.batch_insert_txn_notes(txns, 1), multiThread);
 })();

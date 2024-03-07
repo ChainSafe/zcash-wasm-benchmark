@@ -20,6 +20,7 @@ use web_sys::console;
 use zcash_note_encryption::{batch, BatchDomain, Domain, ShieldedOutput, COMPACT_NOTE_SIZE};
 pub mod types;
 mod utils;
+mod commitment_tree;
 use ff::Field;
 use types::*;
 
