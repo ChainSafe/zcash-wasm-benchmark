@@ -27,6 +27,7 @@ use zcash_note_encryption::{
 mod codegen;
 mod conversions;
 mod utils;
+mod commitment_tree;
 use ff::Field;
 #[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;

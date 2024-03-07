@@ -43,6 +43,9 @@ sapling = { package = "sapling-crypto", version = "0.1.1", default-feature = fal
 ] }
 jubjub = "0.10.0"
 ff = { version = "0.13.0", default-features = false }
+shardtree = "0.2.0"
+zcash_primitives = "0.14.0"
+incrementalmerkletree = "0.5.0"
 
 
 [dev-dependencies]
