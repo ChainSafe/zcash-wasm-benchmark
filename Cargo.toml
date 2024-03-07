@@ -28,7 +28,7 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 zcash_note_encryption = "0.4.0"
 orchard = { version = "0.7.0", default-features = false }
 getrandom = { version = "0.2.12", features = ["js"] }
-web-sys = { version = "0.3.68", features = ["console"] }
+web-sys = { version = "0.3.68", features = ["console", "ReadableStream"] }
 rand = "0.8.5"
 rayon = "1.8"
 wasm-bindgen-rayon = { version = "1.2", optional = true }
@@ -45,6 +45,8 @@ shardtree = "0.2.0"
 zcash_primitives = "0.14.0"
 incrementalmerkletree = "0.5.0"
 js-sys = "0.3.69"
+wasm-streams = "0.4.0"
+futures-util = { version = "0.3.30", features = ["io", "sink"] }
 
 
 [dev-dependencies]

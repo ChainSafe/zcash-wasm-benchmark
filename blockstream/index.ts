@@ -1,6 +1,5 @@
-import { LwdClient, buildBlockRange } from "./blockstream";
+import { LwdClient, buildBlockRange } from "./bs";
 import { CompactBlock as CompactBlockPb } from "./generated/compact_formats_pb";
-
 let num_concurrency = navigator.hardwareConcurrency;
 console.log("num_concurrency: ", num_concurrency);
 
@@ -21,8 +20,21 @@ function setupBtnDownload(
       let blocksProcessed = 0;
       let notesProcessed = 0;
       let start = performance.now();
+<<<<<<< Updated upstream
 
       let client = new LwdClient("http://0.0.0.0:443", null, null);
+=======
+      if (id === "trialDecryptSapling") {
+        console.log("Button clicked for Sapling trial decrypt");
+      } else if (id === "trialDecryptOrchard") {
+        console.log("Button clicked for Orchard trial decrypt");
+      } else if (id === "trialDecryptBoth") {
+        console.log("Button clicked for both trial decrypt");
+      } else {
+        console.error("Invalid button id");
+      }
+      let client = new LwdClient("http://localhost:443", null, null);
+>>>>>>> Stashed changes
 
       let blockStream = client.getBlockRange(buildBlockRange(START, END), {});
 
@@ -110,12 +122,30 @@ function setupBtn(id, f) {
   });
 }
 
+function setupCrazy(id: string, { stream }) {
+  Object.assign(document.getElementById(id), {
+    async onclick() {
+      const start = performance.now();
+      await stream();
+      const time = performance.now() - start;
+
+      console.log(`${time.toFixed(2)} ms`);
+    },
+    disabled: false,
+  });
+}
+
 (async function initSingleThread() {
   const singleThread = await import(
     "./wasm-pkg/serial/zcash_wasm_benchmark.js"
   );
   await singleThread.default();
+<<<<<<< Updated upstream
   setupBtn("singleThread", singleThread.proof);
+=======
+  setupBtn("singleThread", singleThread);
+  setupCrazy("crazyStuff", singleThread);
+>>>>>>> Stashed changes
 })();
 
 (async function initMultiThread() {
