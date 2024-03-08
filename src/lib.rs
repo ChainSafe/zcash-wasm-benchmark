@@ -1,13 +1,22 @@
+use std::convert::TryFrom;
+use std::convert::TryInto;
+
+use orchard::note_encryption::CompactAction;
+use orchard::note_encryption::OrchardDomain;
+use sapling::note_encryption::SaplingDomain;
+use sapling::note_encryption::Zip212Enforcement;
+use trial_decryption::decrypt_compact;
 use wasm_bindgen::prelude::*;
 
 mod commitment_tree;
 mod proof_gen;
 mod trial_decryption;
 mod types;
+use futures_util::stream;
 use futures_util::StreamExt;
-
-use web_sys::{console, ReadableStream};
-
+use tonic_web_wasm_client::Client;
+use web_sys::console::{self};
+mod proto;
 #[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;
 
@@ -22,43 +31,77 @@ pub fn set_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
-// The following code is mostly copy pasta of benchmarks from orchard repo: https://github.com/zcash/orchard/blob/main/benches/
+#[wasm_bindgen]
+pub async fn sapling_decrypt_wasm(start: u32, end: u32) -> u32 {
+    console::log_1(&"Starting Sapling Trial Decryption all in WASM".into());
+    let mut s = proto::service::compact_tx_streamer_client::CompactTxStreamerClient::new(
+        Client::new("http://localhost:443".to_string()),
+    );
+    let start = proto::service::BlockId {
+        // height: 1687104 + 10000,
+        height: start as u64,
+        hash: vec![],
+    };
+    let end = proto::service::BlockId {
+        // height: 1687104 + 10000 + 3,
+        height: end as u64,
+        hash: vec![],
+    };
+    let range = proto::service::BlockRange {
+        start: Some(start),
+        end: Some(end),
+    };
+    let ivks = crate::trial_decryption::dummy_ivk_sapling(1);
 
-// #[wasm_bindgen(js_namespace = ["proto", "cash", "z","wallet"])]
-#[wasm_bindgen(module = "/blockstream/blockstream.js")]
-extern "C" {
-    #[wasm_bindgen(js_name = LwdClient)]
-    type LwdClient;
+    console::time_with_label("Download blocks and deserialization");
+    let stream = s.get_block_range(range).await.unwrap().into_inner();
 
-    type BlockRange;
-
-    #[wasm_bindgen(constructor)]
-    fn new(url: &str) -> LwdClient;
-
-    #[wasm_bindgen(method)]
-    fn getBlockRange(this: &LwdClient, range: BlockRange, metadata: JsValue) -> ReadableStream;
-
-    fn buildBlockRange(start: u32, end: u32) -> BlockRange;
-
-}
-
-fn _ensure_emitted() {
-    // Just ensure that the worker is emitted into the output folder, but don't actually use the URL.
-    wasm_bindgen::link_to!(module = "/blockstream/blockstream.js");
+    let compact = stream
+        .flat_map(|b| stream::iter(b.unwrap().vtx))
+        .flat_map(|ctx| stream::iter(ctx.outputs))
+        .map(sapling::note_encryption::CompactOutputDescription::try_from)
+        .map(|x| (SaplingDomain::new(Zip212Enforcement::Off), x.unwrap()))
+        .collect::<Vec<_>>()
+        .await;
+    console::time_end_with_label("Download blocks and deserialization");
+    decrypt_compact(ivks.as_slice(), &compact)
 }
 
 #[wasm_bindgen]
-pub async fn stream() {
-    let client = LwdClient::new("http://localhost:443");
-    let range = buildBlockRange(1687104 + 10000, 1687104 + 10002);
+pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
+    console::log_1(&"Starting Orchard Trial Decryption all in WASM".into());
+    let mut s = proto::service::compact_tx_streamer_client::CompactTxStreamerClient::new(
+        Client::new("http://localhost:443".to_string()),
+    );
+    let start = proto::service::BlockId {
+        height: start as u64,
+        hash: vec![],
+    };
+    let end = proto::service::BlockId {
+        height: end as u64,
+        hash: vec![],
+    };
+    let range = proto::service::BlockRange {
+        start: Some(start),
+        end: Some(end),
+    };
+    let ivks = crate::trial_decryption::dummy_ivk_orchard(1);
 
-    let resp = client.getBlockRange(range, JsValue::null());
-    console::log_1(&format!("Locked: {}", resp.locked()).into());
-    console::log_1(&resp);
-    let mut body = wasm_streams::ReadableStream::from_raw(resp);
-    console::log_1(&format!("wasm stream locked {}", body.is_locked()).into());
-    let mut reader = body.get_reader();
-    // Convert the JS ReadableStream to a Rust stream
+    console::time_with_label("Download blocks and deserialization");
+    let stream = s.get_block_range(range).await.unwrap().into_inner();
+
+    let compact = stream
+        .flat_map(|b| stream::iter(b.unwrap().vtx))
+        .flat_map(|ctx| stream::iter(ctx.actions))
+        .map(|x| {
+            let action: CompactAction = x.try_into().unwrap();
+            let domain = OrchardDomain::for_nullifier(action.nullifier());
+            (domain, action)
+        })
+        .collect::<Vec<_>>()
+        .await;
+    console::time_end_with_label("Download blocks and deserialization");
+    decrypt_compact(ivks.as_slice(), &compact)
 }
 
 #[wasm_bindgen(start)]

@@ -137,7 +137,7 @@ pub fn decrypt_vtx_both(vtxs: Box<[CompactTx]>) -> u32 {
     s + o
 }
 
-fn decrypt_compact<D: BatchDomain, Output: ShieldedOutput<D, COMPACT_NOTE_SIZE>>(
+pub(crate) fn decrypt_compact<D: BatchDomain, Output: ShieldedOutput<D, COMPACT_NOTE_SIZE>>(
     ivks: &[D::IncomingViewingKey],
     compact: &[(D, Output)],
 ) -> u32
@@ -182,7 +182,9 @@ where
     compact.len() as u32
 }
 
-fn dummy_ivk_sapling(count: usize) -> Vec<sapling::note_encryption::PreparedIncomingViewingKey> {
+pub(crate) fn dummy_ivk_sapling(
+    count: usize,
+) -> Vec<sapling::note_encryption::PreparedIncomingViewingKey> {
     let mut rng = OsRng;
 
     (1..=count)
@@ -191,7 +193,7 @@ fn dummy_ivk_sapling(count: usize) -> Vec<sapling::note_encryption::PreparedInco
         .collect::<Vec<_>>()
 }
 
-fn dummy_ivk_orchard(count: usize) -> Vec<PreparedIncomingViewingKey> {
+pub(crate) fn dummy_ivk_orchard(count: usize) -> Vec<PreparedIncomingViewingKey> {
     (1..=count)
         .map(|i| {
             let fvk = FullViewingKey::from(&SpendingKey::from_bytes([i as u8; 32]).unwrap());

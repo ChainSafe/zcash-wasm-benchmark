@@ -28,7 +28,20 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 zcash_note_encryption = "0.4.0"
 orchard = { version = "0.7.0", default-features = false }
 getrandom = { version = "0.2.12", features = ["js"] }
-web-sys = { version = "0.3.68", features = ["console", "ReadableStream"] }
+web-sys = { version = "0.3.68", features = [
+    "console",
+    "ReadableStream",
+    "Headers",
+    "ReferrerPolicy",
+    "Request",
+    "RequestCache",
+    "RequestCredentials",
+    "RequestInit",
+    "RequestMode",
+    "RequestRedirect",
+    "Response",
+    "ServiceWorkerGlobalScope",
+] }
 rand = "0.8.5"
 rayon = "1.8"
 wasm-bindgen-rayon = { version = "1.2", optional = true }
@@ -48,6 +61,18 @@ js-sys = "0.3.69"
 wasm-streams = "0.4.0"
 futures-util = { version = "0.3.30", features = ["io", "sink"] }
 
+prost = { version = "0.12", default-features = false }
+tonic = { version = "0.11", default-features = false, features = [
+    "prost",
+    "codegen",
+] }
+tonic-web-wasm-client = "0.5"
+
+[build-dependencies]
+tonic-build = { version = "0.11", default-features = false, features = [
+    "prost",
+] }
+which = "4"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"

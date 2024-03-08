@@ -1,10 +1,10 @@
-import { LwdClient, buildBlockRange } from "./bs";
+import { LwdClient, buildBlockRange } from "./blockstream";
 import { CompactBlock as CompactBlockPb } from "./generated/compact_formats_pb";
 let num_concurrency = navigator.hardwareConcurrency;
 console.log("num_concurrency: ", num_concurrency);
 
 const ORCHARD_ACTIVATION = 1687104;
-const START = ORCHARD_ACTIVATION + 10000;
+const START = ORCHARD_ACTIVATION + 15000;
 const END = START + 10000;
 
 let blocks: Map<number, CompactBlockPb> = new Map();
@@ -114,11 +114,17 @@ function setupBtn(id, f) {
   });
 }
 
-function setupCrazy(id: string, { stream }) {
+function setupFullWasm(id: string, rt) {
   Object.assign(document.getElementById(id), {
     async onclick() {
       const start = performance.now();
-      await stream();
+      if (id === "orchardFullWasm") {
+        await rt.orchard_decrypt_wasm(START, END);
+      } else if (id === "saplingFullWasm") {
+        await rt.sapling_decrypt_wasm(START, END);
+      } else {
+        throw new Error("unknown id");
+      }
       const time = performance.now() - start;
 
       console.log(`${time.toFixed(2)} ms`);
@@ -133,7 +139,6 @@ function setupCrazy(id: string, { stream }) {
   );
   await singleThread.default();
   setupBtn("singleThread", singleThread.proof);
-  setupCrazy("crazyStuff", singleThread);
 })();
 
 (async function initMultiThread() {
@@ -165,4 +170,6 @@ function setupCrazy(id: string, { stream }) {
     (txns) => multiThread.batch_insert_txn_notes(txns, 1),
     multiThread,
   );
+  setupFullWasm("orchardFullWasm", multiThread);
+  setupFullWasm("saplingFullWasm", multiThread);
 })();
