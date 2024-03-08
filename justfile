@@ -24,7 +24,7 @@ _check-profile profile:
 
 # Serves the web page using Parcel
 serve:
-    cd blockstream && yarn && yarn parcel  index.html
+    cd blockstream && yarn && yarn parcel index.html
 
 # Test in headless mode on firefox
 test-headless-firefox +FLAGS:
@@ -47,11 +47,6 @@ generate-pb-js:
     mkdir -p blockstream/generated
     protoc -I=./protos service.proto compact_formats.proto --js_out=import_style=commonjs:./blockstream/generated \
     --grpc-web_out=import_style=typescript,mode=grpcwebtext:./blockstream/generated
-
-generate-pb-js-rust:
-    mkdir -p blockstream/generated-wasm
-    protoc -I=./protos service.proto compact_formats.proto --js_out=import_style=commonjs:./blockstream/generated-wasm \
-    --grpc-web_out=import_style=commonjs,mode=grpcwebtext:./blockstream/generated-wasm
 
 # run a local proxy to the lightwalletd server on port 443
 run-proxy:

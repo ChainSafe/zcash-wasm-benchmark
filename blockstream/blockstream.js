@@ -22,8 +22,8 @@ blockStream.on('end', function(end) {
 ```
 */
 
-import { CompactTxStreamerClient as LwdClient } from "./generated/ServiceServiceClientPb.ts";
-import { BlockRange, BlockID } from "./generated/service_pb.js";
+import { CompactTxStreamerClient as LwdClient } from "./generated/ServiceServiceClientPb";
+import { BlockRange, BlockID } from "./generated/service_pb";
 
 /// Accepts a start and end block height as numbers and returns a BlockRange object
 /// as defined in the protobuf schema. This can be passed directly to LwdClient.getBlockRange
