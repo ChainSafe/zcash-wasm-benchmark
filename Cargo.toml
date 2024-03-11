@@ -30,6 +30,7 @@ orchard = { version = "0.7.0", default-features = false }
 getrandom = { version = "0.2.12", features = ["js"] }
 web-sys = { version = "0.3.68", features = [
     "console",
+    "Performance",
     "ReadableStream",
     "Headers",
     "ReferrerPolicy",

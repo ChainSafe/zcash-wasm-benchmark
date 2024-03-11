@@ -6,7 +6,7 @@ use rand::rngs::OsRng;
 
 use std::convert::TryInto;
 
-use crate::types::*;
+use crate::{types::*, PERFORMANCE};
 use ff::Field;
 use rayon::prelude::*;
 use sapling::{
@@ -19,7 +19,7 @@ use zcash_note_encryption::{batch, BatchDomain, Domain, ShieldedOutput, COMPACT_
 
 #[wasm_bindgen]
 pub fn decrypt_vtx_orchard(vtxs: Box<[CompactTx]>) -> u32 {
-    console::time_with_label("Converting VTX");
+    let start = PERFORMANCE.now();
     let compact = vtxs
         .iter()
         .flat_map(|tx| {
@@ -33,7 +33,7 @@ pub fn decrypt_vtx_orchard(vtxs: Box<[CompactTx]>) -> u32 {
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
-    console::time_end_with_label("Converting VTX");
+    console::log_1(&format!("Converting VTX: {}ms", PERFORMANCE.now() - start).into());
     let ivks = dummy_ivk_orchard(1);
 
     console::log_1(
@@ -49,7 +49,7 @@ pub fn decrypt_vtx_orchard(vtxs: Box<[CompactTx]>) -> u32 {
 
 #[wasm_bindgen]
 pub fn decrypt_vtx_sapling(vtxs: Box<[CompactTx]>) -> u32 {
-    console::time_with_label("Converting VTX");
+    let start = PERFORMANCE.now();
     let compact = vtxs
         .iter()
         .flat_map(|tx| {
@@ -62,7 +62,7 @@ pub fn decrypt_vtx_sapling(vtxs: Box<[CompactTx]>) -> u32 {
                 .collect::<Vec<_>>()
         })
         .collect::<Box<[_]>>();
-    console::time_end_with_label("Converting VTX");
+    console::log_1(&format!("Converting VTX: {}ms", PERFORMANCE.now() - start).into());
 
     let ivks = dummy_ivk_sapling(1);
 
@@ -80,7 +80,7 @@ pub fn decrypt_vtx_sapling(vtxs: Box<[CompactTx]>) -> u32 {
 
 #[wasm_bindgen]
 pub fn decrypt_vtx_both(vtxs: Box<[CompactTx]>) -> u32 {
-    console::time_with_label("Converting VTX");
+    let start = PERFORMANCE.now();
     let (actions, outputs) =
         vtxs.iter()
             .fold((vec![], vec![]), |(mut actions, mut outputs), tx| {
@@ -106,7 +106,7 @@ pub fn decrypt_vtx_both(vtxs: Box<[CompactTx]>) -> u32 {
                 (actions, outputs)
             });
     drop(vtxs);
-    console::time_end_with_label("Converting VTX");
+    console::log_1(&format!("Converting VTX: {}ms", PERFORMANCE.now() - start).into());
 
     let ivks = dummy_ivk_sapling(1);
 
@@ -150,28 +150,36 @@ where
     let num_parallel = rayon::current_num_threads();
     console::log_1(&format!("Rayon available parallelism Num Parallel: {}", num_parallel).into());
 
-    console::time_with_label(&format!("Decrypted Total {} transactions", compact.len()));
+    let start = PERFORMANCE.now();
     let results = compact
         .par_chunks(usize::div_ceil(compact.len(), num_parallel))
         .enumerate()
         .map(|(i, c)| {
-            console::time_with_label(&format!(
-                "Decrypted chunk {} of {} transactions",
-                i,
-                c.len()
-            ));
+            let start = PERFORMANCE.now();
+
             let r = batch::try_compact_note_decryption(ivks, c);
-            console::time_end_with_label(&format!(
-                "Decrypted chunk {} of {} transactions",
-                i,
-                c.len()
-            ));
+            console::log_1(
+                &format!(
+                    "Decrypted chunk {} of {} transactions: {}ms",
+                    i,
+                    c.len(),
+                    PERFORMANCE.now() - start
+                )
+                .into(),
+            );
             r
         })
         .flatten()
         .collect::<Vec<_>>();
 
-    console::time_end_with_label(&format!("Decrypted Total {} transactions", compact.len()));
+    console::log_1(
+        &format!(
+            "Decrypted Total {} transactions: {}ms",
+            compact.len(),
+            PERFORMANCE.now() - start
+        )
+        .into(),
+    );
 
     let valid_results = results.into_iter().flatten().collect::<Vec<_>>();
     if valid_results.is_empty() {
