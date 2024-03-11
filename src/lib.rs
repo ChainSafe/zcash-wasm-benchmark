@@ -42,12 +42,11 @@ pub fn set_panic_hook() {
 #[wasm_bindgen]
 pub async fn sapling_decrypt_wasm(start: u32, end: u32) -> u32 {
     console::log_1(&"Starting Sapling Trial Decryption all in WASM".into());
-    console::log_1(&format!("Block Range: [{}, {}]", start, end).into());
 
     let ivks = crate::trial_decryption::dummy_ivk_sapling(1);
 
     let dl_blocks = PERFORMANCE.now();
-    let stream = block_range_stream("http://localhost:433", start, end).await;
+    let stream = block_range_stream("http://localhost:443", start, end).await;
 
     let compact = stream
         .flat_map(|b| stream::iter(b.unwrap().vtx))
@@ -69,12 +68,11 @@ pub async fn sapling_decrypt_wasm(start: u32, end: u32) -> u32 {
 #[wasm_bindgen]
 pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
     console::log_1(&"Starting Orchard Trial Decryption all in WASM".into());
-    console::log_1(&format!("Block Range: [{}, {}]", start, end).into());
 
     let ivks = crate::trial_decryption::dummy_ivk_orchard(1);
 
     let dl_block = PERFORMANCE.now();
-    let stream = block_range_stream("http://localhost:433", start, end).await;
+    let stream = block_range_stream("http://localhost:443", start, end).await;
 
     let compact = stream
         .flat_map(|b| stream::iter(b.unwrap().vtx))
