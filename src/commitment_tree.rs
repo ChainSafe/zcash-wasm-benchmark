@@ -1,8 +1,7 @@
 /**
  * Defines a commitment tree for Orchard that can be used for benchmarking purposes
  */
-
-use incrementalmerkletree::{Position, Retention, frontier::Frontier};
+use incrementalmerkletree::{frontier::Frontier, Position, Retention};
 use orchard::tree::MerkleHashOrchard;
 use rayon::prelude::*;
 use shardtree::store::memory::MemoryShardStore;
@@ -18,7 +17,8 @@ pub type OrchardMemoryShardStore = MemoryShardStore<orchard::tree::MerkleHashOrc
 pub type OrchardCommitmentTree =
     ShardTree<OrchardMemoryShardStore, { ORCHARD_SHARD_HEIGHT * 2 }, ORCHARD_SHARD_HEIGHT>;
 
-pub type OrchardFrontier = Frontier<orchard::tree::MerkleHashOrchard, { orchard::NOTE_COMMITMENT_TREE_DEPTH as u8 }>;
+pub type OrchardFrontier =
+    Frontier<orchard::tree::MerkleHashOrchard, { orchard::NOTE_COMMITMENT_TREE_DEPTH as u8 }>;
 
 // insert n_nodes integers into a new tree and benchmark it
 pub fn batch_insert_mock_data(tree: &mut OrchardCommitmentTree, n_nodes: usize) {
@@ -31,23 +31,38 @@ pub fn batch_insert_mock_data(tree: &mut OrchardCommitmentTree, n_nodes: usize) 
         })
         .collect::<Vec<_>>();
 
-        parallel_batch_add_commitments(tree, Position::from(0), &commitments);
+    parallel_batch_add_commitments(tree, Position::from(0), &commitments);
 }
 
 /// Insert all notes from a batch of transactions into an in-memory commitment tree starting from a given position
-pub fn batch_insert_from_actions(tree: &mut OrchardCommitmentTree, start_position: Position, actions: Vec<CompactAction>) {
+pub fn batch_insert_from_actions(
+    tree: &mut OrchardCommitmentTree,
+    start_position: Position,
+    actions: Vec<CompactAction>,
+) {
     let commitments = actions
         .iter()
-        .map(|action| {
-            MerkleHashOrchard::from_cmx(&action.cmx())
-        })
+        .map(|action| MerkleHashOrchard::from_cmx(&action.cmx()))
         .collect::<Vec<_>>();
 
-        parallel_batch_add_commitments(tree, start_position, &commitments);
+    parallel_batch_add_commitments(tree, start_position, &commitments);
 }
 
-fn batch_add_commitments(tree: &mut OrchardCommitmentTree, start_position: Position, commitments: &[MerkleHashOrchard]) {
-    let values = commitments.iter().enumerate().map(|(i, cmx)| (*cmx, if i == 0 { Retention::Marked } else { Retention::Ephemeral }));
+fn batch_add_commitments(
+    tree: &mut OrchardCommitmentTree,
+    start_position: Position,
+    commitments: &[MerkleHashOrchard],
+) {
+    let values = commitments.iter().enumerate().map(|(i, cmx)| {
+        (
+            *cmx,
+            if i == 0 {
+                Retention::Marked
+            } else {
+                Retention::Ephemeral
+            },
+        )
+    });
     // note that all leaves are being marked ephemeral and will be pruned out
     // once they have been used to updated any witnesses the tree is tracking
     tree.batch_insert(start_position, values).unwrap();
@@ -56,8 +71,11 @@ fn batch_add_commitments(tree: &mut OrchardCommitmentTree, start_position: Posit
 /// Use rayon to parallelize adding batch of commitments to the tree by building the shards
 /// in parallel then adding them in after
 /// based on the code here (https://github.com/zcash/librustzcash/blob/b3d06ba41904965f3b8165011e14e1d13b3c7b81/zcash_client_sqlite/src/lib.rs#L730)
-fn parallel_batch_add_commitments(tree: &mut OrchardCommitmentTree, start_position: Position, commitments: &[MerkleHashOrchard]) {
-
+fn parallel_batch_add_commitments(
+    tree: &mut OrchardCommitmentTree,
+    start_position: Position,
+    commitments: &[MerkleHashOrchard],
+) {
     // Create subtrees from the note commitments in parallel.
     const CHUNK_SIZE: usize = 1024;
 
@@ -71,10 +89,16 @@ fn parallel_batch_add_commitments(tree: &mut OrchardCommitmentTree, start_positi
             shardtree::LocatedTree::from_iter(
                 start..end,
                 ORCHARD_SHARD_HEIGHT.into(),
-                chunk
-                    .iter()
-                    .enumerate()
-                    .map(|(i, cmx)| (*cmx, if i == 0 { Retention::Marked } else { Retention::Ephemeral })), 
+                chunk.iter().enumerate().map(|(i, cmx)| {
+                    (
+                        *cmx,
+                        if i == 0 {
+                            Retention::Marked
+                        } else {
+                            Retention::Ephemeral
+                        },
+                    )
+                }),
                 // note that all leaves marked ephemeral  (all but the first added) will be pruned out
                 // once they have been used to updated any witnesses the tree is tracking
             )
