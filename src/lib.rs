@@ -110,7 +110,7 @@ pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
 /// included in blocks between start and end.
 /// Finally checks to ensure the computed tree frontier matches the expected frontier at the end block height
 #[wasm_bindgen]
-pub async fn orchard_sync_commitment_tree(start: u32, end: u32) {
+pub async fn orchard_sync_commitment_tree_demo(start: u32, end: u32) {
     let init_frontier = fetch_orchard_frontier_at_height(GRPC_URL, start - 1).await.unwrap();
 
     // create the tree and initialize it to the initial frontier
@@ -122,9 +122,9 @@ pub async fn orchard_sync_commitment_tree(start: u32, end: u32) {
         console::log_1(&format!("Frontier was found for height {}: {:?}", start - 1, frontier).into());
         start_position = frontier.position() + 1;
         tree.insert_frontier_nodes(frontier, Retention::Checkpoint {
-            // checkpoint at the block height the frontier was at
             id: (start - 1).into(),
             is_marked: false,
+        
         }).unwrap();
     } else {
         // checkpoint the tree at the start
@@ -145,7 +145,35 @@ pub async fn orchard_sync_commitment_tree(start: u32, end: u32) {
         .collect::<Vec<_>>()
         .await;
 
-    commitment_tree::batch_insert_from_actions(&mut tree, start_position, actions, 10);
+    console::log_1(&format!("Downloaded and deserialized {} actions", actions.len()).into());
+
+    let update_tree = PERFORMANCE.now();
+    commitment_tree::batch_insert_from_actions(&mut tree, start_position, actions);
+    console::log_1(
+        &format!(
+            "Update commitment tree: {}ms",
+            PERFORMANCE.now() - update_tree
+        )
+        .into(),
+    );
+
+
+    // produce a witness for the first added leaf
+    let calc_witness = PERFORMANCE.now();
+    let _witness = tree.witness_at_checkpoint_depth(start_position, 0).unwrap();
+    console::log_1(
+        &format!(
+            "Produce witness for leftmost leaf: {}ms",
+            PERFORMANCE.now() - calc_witness
+        )
+        .into(),
+    );
+
+    // the end frontier should be the witness of the last added commitment
+    // this can give us the root of the new tree produced by adding all the commitments
+    let end_frontier = fetch_orchard_frontier_at_height(GRPC_URL, end).await.unwrap();
+    assert_eq!(end_frontier.root(), tree.root_at_checkpoint_depth(0).unwrap());
+    console::log_1(&format!("✅ Computed root for block {} matches lightwalletd ✅", end).into());
 }
 
 pub async fn block_range_stream(base_url: &str, start: u32, end: u32) -> Streaming<CompactBlock> {

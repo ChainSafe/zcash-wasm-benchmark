@@ -1,17 +1,12 @@
 /**
  * Defines a commitment tree for Orchard that can be used for benchmarking purposes
  */
-use std::convert::TryInto;
 
 use incrementalmerkletree::{Position, Retention, frontier::Frontier};
-use orchard::note::ExtractedNoteCommitment;
 use orchard::tree::MerkleHashOrchard;
 use rayon::prelude::*;
 use shardtree::store::memory::MemoryShardStore;
 use shardtree::ShardTree;
-use wasm_bindgen::prelude::*;
-use web_sys::console;
-use zcash_client_backend::data_api::SAPLING_SHARD_HEIGHT;
 use zcash_primitives::consensus::BlockHeight;
 
 use crate::CompactAction;
@@ -26,7 +21,7 @@ pub type OrchardCommitmentTree =
 pub type OrchardFrontier = Frontier<orchard::tree::MerkleHashOrchard, { orchard::NOTE_COMMITMENT_TREE_DEPTH as u8 }>;
 
 // insert n_nodes integers into a new tree and benchmark it
-pub fn batch_insert_mock_data(tree: &mut OrchardCommitmentTree, n_nodes: usize, n_genwitness: usize) {
+pub fn batch_insert_mock_data(tree: &mut OrchardCommitmentTree, n_nodes: usize) {
     let mut b = [0_u8; 32];
 
     let commitments = (0..n_nodes)
@@ -36,11 +31,11 @@ pub fn batch_insert_mock_data(tree: &mut OrchardCommitmentTree, n_nodes: usize, 
         })
         .collect::<Vec<_>>();
 
-    benchmark_tree(tree, Position::from(0), &commitments, n_genwitness);
+        parallel_batch_add_commitments(tree, Position::from(0), &commitments);
 }
 
 /// Insert all notes from a batch of transactions into an in-memory commitment tree starting from a given position
-pub fn batch_insert_from_actions(tree: &mut OrchardCommitmentTree, start_position: Position, actions: Vec<CompactAction>, n_genwitness: usize) {
+pub fn batch_insert_from_actions(tree: &mut OrchardCommitmentTree, start_position: Position, actions: Vec<CompactAction>) {
     let commitments = actions
         .iter()
         .map(|action| {
@@ -48,46 +43,25 @@ pub fn batch_insert_from_actions(tree: &mut OrchardCommitmentTree, start_positio
         })
         .collect::<Vec<_>>();
 
-    benchmark_tree(tree, start_position, &commitments, n_genwitness);
+        parallel_batch_add_commitments(tree, start_position, &commitments);
 }
 
-/// Run a benchmark of the tree with an iterator of commitments to add.
-/// 
-/// starts with an initial_frontier. Can pass OrchardFrontier::empty() to start with an empty tree
-/// 
-/// The benchmarks marks the first 10 elements as ones we are interested in maintaining the witnesses for
-/// and then adds the remainder as ephemeral nodes (ones that will be pruned and just serve to update the witness)
-/// n_genwitness is the number of nodes to mark as needing a witness generated for them
-fn benchmark_tree(tree: &mut OrchardCommitmentTree, start_position: Position, commitments: &[MerkleHashOrchard], n_genwitness: usize) {
+fn batch_add_commitments(tree: &mut OrchardCommitmentTree, start_position: Position, commitments: &[MerkleHashOrchard]) {
+    let values = commitments.iter().enumerate().map(|(i, cmx)| (*cmx, if i == 0 { Retention::Marked } else { Retention::Ephemeral }));
+    // note that all leaves are being marked ephemeral and will be pruned out
+    // once they have been used to updated any witnesses the tree is tracking
+    tree.batch_insert(start_position, values).unwrap();
+}
 
-    console::log_1(
-        &format!("Adding {} commitments to tree", commitments.len())
-            .as_str()
-            .into(),
-    );
-    console::log_1(
-        &format!("Maintaining witness for {} leaves", n_genwitness)
-            .as_str()
-            .into(),
-    );
+/// Use rayon to parallelize adding batch of commitments to the tree by building the shards
+/// in parallel then adding them in after
+/// based on the code here (https://github.com/zcash/librustzcash/blob/b3d06ba41904965f3b8165011e14e1d13b3c7b81/zcash_client_sqlite/src/lib.rs#L730)
+fn parallel_batch_add_commitments(tree: &mut OrchardCommitmentTree, start_position: Position, commitments: &[MerkleHashOrchard]) {
 
-    // mark the first n_genwitness to generate witnesses for
-    let ours = commitments
-        .iter()
-        .clone()
-        .take(n_genwitness)
-        .map(|cmx| (*cmx, Retention::Marked));
-
-    console::time_with_label("Adding our notes to tree");
-    let (last_added, _incomplete) = tree.batch_insert(start_position, ours).unwrap().unwrap();
-    console::time_end_with_label("Adding our notes to tree");
-
-    console::time_with_label("Updating witnesses with rest");
     // Create subtrees from the note commitments in parallel.
     const CHUNK_SIZE: usize = 1024;
-    let start_position = last_added + 1;
 
-    let subtrees = commitments[n_genwitness..]
+    let subtrees = commitments
         .par_chunks(CHUNK_SIZE)
         .enumerate()
         .filter_map(|(i, chunk)| {
@@ -96,10 +70,13 @@ fn benchmark_tree(tree: &mut OrchardCommitmentTree, start_position: Position, co
 
             shardtree::LocatedTree::from_iter(
                 start..end,
-                SAPLING_SHARD_HEIGHT.into(),
+                ORCHARD_SHARD_HEIGHT.into(),
                 chunk
                     .iter()
-                    .map(|cmx| (*cmx, Retention::<BlockHeight>::Marked)),
+                    .enumerate()
+                    .map(|(i, cmx)| (*cmx, if i == 0 { Retention::Marked } else { Retention::Ephemeral })), 
+                // note that all leaves marked ephemeral  (all but the first added) will be pruned out
+                // once they have been used to updated any witnesses the tree is tracking
             )
         })
         .map(|res| (res.subtree, res.checkpoints))
@@ -109,13 +86,4 @@ fn benchmark_tree(tree: &mut OrchardCommitmentTree, start_position: Position, co
     for (subtree, checkpoints) in subtrees {
         tree.insert_tree(subtree, checkpoints).unwrap();
     }
-    console::time_end_with_label("Updating witnesses with rest");
-
-    console::time_with_label("Calculating witness for first added");
-    let witness = tree
-        .witness_at_checkpoint_depth(start_position, 0)
-        .unwrap();
-    console::time_end_with_label("Calculating witness for first added");
-
-    console::log_1(&format!("Witness {:?}", witness).as_str().into());
 }
