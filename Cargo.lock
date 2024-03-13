@@ -1925,6 +1925,7 @@ dependencies = [
  "ff",
  "futures-util",
  "getrandom",
+ "hex",
  "incrementalmerkletree",
  "js-sys",
  "jubjub",
