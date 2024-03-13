@@ -3,7 +3,7 @@
  */
 use std::convert::TryInto;
 
-use incrementalmerkletree::{Position, Retention};
+use incrementalmerkletree::{Position, Retention, frontier::Frontier};
 use orchard::note::ExtractedNoteCommitment;
 use orchard::tree::MerkleHashOrchard;
 use rayon::prelude::*;
@@ -14,21 +14,19 @@ use web_sys::console;
 use zcash_client_backend::data_api::SAPLING_SHARD_HEIGHT;
 use zcash_primitives::consensus::BlockHeight;
 
-use crate::types::CompactTx;
+use crate::CompactAction;
 
 pub const ORCHARD_SHARD_HEIGHT: u8 = { orchard::NOTE_COMMITMENT_TREE_DEPTH as u8 } / 2;
 
-type OrchardMemoryShardStore = MemoryShardStore<orchard::tree::MerkleHashOrchard, BlockHeight>;
+pub type OrchardMemoryShardStore = MemoryShardStore<orchard::tree::MerkleHashOrchard, BlockHeight>;
 
 pub type OrchardCommitmentTree =
     ShardTree<OrchardMemoryShardStore, { ORCHARD_SHARD_HEIGHT * 2 }, ORCHARD_SHARD_HEIGHT>;
 
-// max number of checkpoints our tree impl can cache to jump back to
-const MAX_CHECKPOINTS: usize = 1;
+pub type OrchardFrontier = Frontier<orchard::tree::MerkleHashOrchard, { orchard::NOTE_COMMITMENT_TREE_DEPTH as u8 }>;
 
 // insert n_nodes integers into a new tree and benchmark it
-#[wasm_bindgen]
-pub fn batch_insert_mock_data(n_nodes: usize, n_genwitness: usize) {
+pub fn batch_insert_mock_data(tree: &mut OrchardCommitmentTree, n_nodes: usize, n_genwitness: usize) {
     let mut b = [0_u8; 32];
 
     let commitments = (0..n_nodes)
@@ -38,35 +36,29 @@ pub fn batch_insert_mock_data(n_nodes: usize, n_genwitness: usize) {
         })
         .collect::<Vec<_>>();
 
-    benchmark_tree(&commitments, n_genwitness);
+    benchmark_tree(tree, &commitments, n_genwitness);
 }
 
 /// Insert all notes from a batch of transactions into an in-memory commitment tree
-#[wasm_bindgen]
-pub fn batch_insert_txn_notes(vtxs: Box<[CompactTx]>, n_genwitness: usize) {
-    let commitments = vtxs // create an iterator over the commitments to add
+pub fn batch_insert_from_actions(tree: &mut OrchardCommitmentTree, actions: Vec<CompactAction>, n_genwitness: usize) {
+    let commitments = actions
         .iter()
-        .flat_map(|tx| {
-            tx.actions
-                .iter()
-                .map(|action| {
-                    ExtractedNoteCommitment::from_bytes(action.cmx.as_ref().try_into().unwrap())
-                        .unwrap()
-                })
-                .collect::<Vec<_>>()
+        .map(|action| {
+            MerkleHashOrchard::from_cmx(&action.cmx())
         })
-        .map(|cmx| MerkleHashOrchard::from_cmx(&cmx))
         .collect::<Vec<_>>();
 
-    benchmark_tree(&commitments, n_genwitness);
+    benchmark_tree(tree, &commitments, n_genwitness);
 }
 
 /// Run a benchmark of the tree with an iterator of commitments to add.
+/// 
+/// starts with an initial_frontier. Can pass OrchardFrontier::empty() to start with an empty tree
+/// 
 /// The benchmarks marks the first 10 elements as ones we are interested in maintaining the witnesses for
 /// and then adds the remainder as ephemeral nodes (ones that will be pruned and just serve to update the witness)
 /// n_genwitness is the number of nodes to mark as needing a witness generated for them
-fn benchmark_tree(commitments: &[MerkleHashOrchard], n_genwitness: usize) {
-    let mut tree = OrchardCommitmentTree::new(OrchardMemoryShardStore::empty(), MAX_CHECKPOINTS);
+fn benchmark_tree(tree: &mut OrchardCommitmentTree, commitments: &[MerkleHashOrchard], n_genwitness: usize) {
 
     // checkpoint the tree at the start so it actually builds witnesses as we go
     // and prunes out ephemeral nodes. Otherwise it will just store all ephemeral nodes and

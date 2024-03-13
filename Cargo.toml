@@ -69,6 +69,7 @@ tonic = { version = "0.11", default-features = false, features = [
     "codegen",
 ] }
 tonic-web-wasm-client = "0.5"
+hex = "0.4.3"
 
 [build-dependencies]
 tonic-build = { version = "0.11", default-features = false, features = [
