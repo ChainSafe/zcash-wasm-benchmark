@@ -114,24 +114,6 @@ function setupBtn(id, f) {
   });
 }
 
-function setupFullWasm(id: string, rt) {
-  Object.assign(document.getElementById(id), {
-    async onclick() {
-      const start = performance.now();
-      if (id === "orchardFullWasm") {
-        await rt.orchard_decrypt_wasm(START, END);
-      } else if (id === "saplingFullWasm") {
-        await rt.sapling_decrypt_wasm(START, END);
-      } else {
-        throw new Error("unknown id");
-      }
-      const time = performance.now() - start;
-
-      console.log(`${time.toFixed(2)} ms`);
-    },
-    disabled: false,
-  });
-}
 
 (async function initSingleThread() {
   const singleThread = await import(
@@ -170,6 +152,6 @@ function setupFullWasm(id: string, rt) {
     (txns) => multiThread.batch_insert_txn_notes(txns, 1),
     multiThread,
   );
-  setupFullWasm("orchardFullWasm", multiThread);
-  setupFullWasm("saplingFullWasm", multiThread);
+  setupBtn("orchardFullWasm", () => multiThread.orchard_decrypt_wasm(START, END));
+  setupBtn("saplingFullWasm", () => multiThread.sapling_decrypt_wasm(START, END));
 })();
