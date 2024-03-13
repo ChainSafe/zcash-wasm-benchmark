@@ -3,13 +3,14 @@ use std::convert::TryInto;
 use std::io::Cursor;
 
 use commitment_tree::OrchardMemoryShardStore;
+use incrementalmerkletree::Position;
 use orchard::note_encryption::CompactAction;
 use orchard::note_encryption::OrchardDomain;
 use proto::compact_formats::CompactBlock;
 use sapling::note_encryption::SaplingDomain;
 use sapling::note_encryption::Zip212Enforcement;
 use incrementalmerkletree::Retention;
-use zcash_primitives::merkle_tree::read_frontier_v1;
+use zcash_primitives::merkle_tree::read_frontier_v0;
 use tonic::Streaming;
 use trial_decryption::decrypt_compact;
 use wasm_bindgen::prelude::*;
@@ -108,17 +109,26 @@ pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
 /// Retrieve the tree frontier at the given start block height and then process all note commitments
 /// included in blocks between start and end.
 /// Finally checks to ensure the computed tree frontier matches the expected frontier at the end block height
+#[wasm_bindgen]
 pub async fn orchard_sync_commitment_tree(start: u32, end: u32) {
     let init_frontier = orchard_frontier_at_height(GRPC_URL, start).await.unwrap();
-    let final_frontier = orchard_frontier_at_height(GRPC_URL, end).await.unwrap();
+    // let final_frontier = orchard_frontier_at_height(GRPC_URL, end).await.unwrap();
 
     // create the tree and initialize it to the initial frontier
     let mut tree = OrchardCommitmentTree::new(OrchardMemoryShardStore::empty(), MAX_CHECKPOINTS);
     if let Some(frontier) = init_frontier.take() {
         tree.insert_frontier_nodes(frontier, Retention::Ephemeral).unwrap();
     }
+    
+    // discover from which index we should start adding to the commitment tree
+    // this is pretty hacky and we will want to do it differently in the future
+    let first_block = block_range_stream(GRPC_URL, start, start+1).await.next().await.unwrap().unwrap();
+    let start_position = Position::from(first_block.chain_metadata.unwrap().orchard_commitment_tree_size as u64);
+
+    console::log_1(&format!("orchard commitment tree starting from position: {:?}", start_position).into());
 
     let stream = block_range_stream(GRPC_URL, start, end).await;
+
     let actions = stream
         .flat_map(|b| stream::iter(b.unwrap().vtx))
         .flat_map(|ctx| stream::iter(ctx.actions))
@@ -129,7 +139,7 @@ pub async fn orchard_sync_commitment_tree(start: u32, end: u32) {
         .collect::<Vec<_>>()
         .await;
 
-    commitment_tree::batch_insert_from_actions(&mut tree, actions, 100);
+    commitment_tree::batch_insert_from_actions(&mut tree, start_position, actions, 100);
 }
 
 pub async fn block_range_stream(base_url: &str, start: u32, end: u32) -> Streaming<CompactBlock> {
@@ -162,7 +172,8 @@ pub async fn orchard_frontier_at_height(base_url: &str, height: u32) -> anyhow::
     };
     let pb_tree_state = s.get_tree_state(start).await?.into_inner();
     let orchard_tree_frontier_bytes = hex::decode(pb_tree_state.orchard_tree)?;
-    let frontier: OrchardFrontier = read_frontier_v1(Cursor::new(orchard_tree_frontier_bytes))?;
+
+    let frontier: OrchardFrontier = read_frontier_v0(Cursor::new(orchard_tree_frontier_bytes))?;
     Ok(frontier)
 }
 

@@ -36,11 +36,11 @@ pub fn batch_insert_mock_data(tree: &mut OrchardCommitmentTree, n_nodes: usize, 
         })
         .collect::<Vec<_>>();
 
-    benchmark_tree(tree, &commitments, n_genwitness);
+    benchmark_tree(tree, Position::from(0), &commitments, n_genwitness);
 }
 
-/// Insert all notes from a batch of transactions into an in-memory commitment tree
-pub fn batch_insert_from_actions(tree: &mut OrchardCommitmentTree, actions: Vec<CompactAction>, n_genwitness: usize) {
+/// Insert all notes from a batch of transactions into an in-memory commitment tree starting from a given position
+pub fn batch_insert_from_actions(tree: &mut OrchardCommitmentTree, start_position: Position, actions: Vec<CompactAction>, n_genwitness: usize) {
     let commitments = actions
         .iter()
         .map(|action| {
@@ -48,7 +48,7 @@ pub fn batch_insert_from_actions(tree: &mut OrchardCommitmentTree, actions: Vec<
         })
         .collect::<Vec<_>>();
 
-    benchmark_tree(tree, &commitments, n_genwitness);
+    benchmark_tree(tree, start_position, &commitments, n_genwitness);
 }
 
 /// Run a benchmark of the tree with an iterator of commitments to add.
@@ -58,7 +58,7 @@ pub fn batch_insert_from_actions(tree: &mut OrchardCommitmentTree, actions: Vec<
 /// The benchmarks marks the first 10 elements as ones we are interested in maintaining the witnesses for
 /// and then adds the remainder as ephemeral nodes (ones that will be pruned and just serve to update the witness)
 /// n_genwitness is the number of nodes to mark as needing a witness generated for them
-fn benchmark_tree(tree: &mut OrchardCommitmentTree, commitments: &[MerkleHashOrchard], n_genwitness: usize) {
+fn benchmark_tree(tree: &mut OrchardCommitmentTree, start_position: Position, commitments: &[MerkleHashOrchard], n_genwitness: usize) {
 
     // checkpoint the tree at the start so it actually builds witnesses as we go
     // and prunes out ephemeral nodes. Otherwise it will just store all ephemeral nodes and
@@ -84,7 +84,7 @@ fn benchmark_tree(tree: &mut OrchardCommitmentTree, commitments: &[MerkleHashOrc
         .map(|cmx| (*cmx, Retention::Marked));
 
     console::time_with_label("Adding our notes to tree");
-    let (last_added, _incomplete) = tree.batch_insert(Position::from(0), ours).unwrap().unwrap();
+    let (last_added, _incomplete) = tree.batch_insert(start_position, ours).unwrap().unwrap();
     console::time_end_with_label("Adding our notes to tree");
 
     console::time_with_label("Updating witnesses with rest");
