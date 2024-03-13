@@ -60,11 +60,6 @@ pub fn batch_insert_from_actions(tree: &mut OrchardCommitmentTree, start_positio
 /// n_genwitness is the number of nodes to mark as needing a witness generated for them
 fn benchmark_tree(tree: &mut OrchardCommitmentTree, start_position: Position, commitments: &[MerkleHashOrchard], n_genwitness: usize) {
 
-    // checkpoint the tree at the start so it actually builds witnesses as we go
-    // and prunes out ephemeral nodes. Otherwise it will just store all ephemeral nodes and
-    // to hash later which uses more memory and isn't a useful benchmark
-    let _success = tree.checkpoint(0.into()).unwrap();
-
     console::log_1(
         &format!("Adding {} commitments to tree", commitments.len())
             .as_str()
@@ -76,7 +71,7 @@ fn benchmark_tree(tree: &mut OrchardCommitmentTree, start_position: Position, co
             .into(),
     );
 
-    // mark the first n_genwitness, the rest as ephemeral
+    // mark the first n_genwitness to generate witnesses for
     let ours = commitments
         .iter()
         .clone()
@@ -104,7 +99,7 @@ fn benchmark_tree(tree: &mut OrchardCommitmentTree, start_position: Position, co
                 SAPLING_SHARD_HEIGHT.into(),
                 chunk
                     .iter()
-                    .map(|cmx| (*cmx, Retention::<BlockHeight>::Ephemeral)),
+                    .map(|cmx| (*cmx, Retention::<BlockHeight>::Marked)),
             )
         })
         .map(|res| (res.subtree, res.checkpoints))
@@ -118,7 +113,7 @@ fn benchmark_tree(tree: &mut OrchardCommitmentTree, start_position: Position, co
 
     console::time_with_label("Calculating witness for first added");
     let witness = tree
-        .witness_at_checkpoint_depth(Position::from(0), 0)
+        .witness_at_checkpoint_depth(start_position, 0)
         .unwrap();
     console::time_end_with_label("Calculating witness for first added");
 

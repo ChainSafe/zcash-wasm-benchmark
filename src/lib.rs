@@ -111,19 +111,25 @@ pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
 /// Finally checks to ensure the computed tree frontier matches the expected frontier at the end block height
 #[wasm_bindgen]
 pub async fn orchard_sync_commitment_tree(start: u32, end: u32) {
-    let init_frontier = orchard_frontier_at_height(GRPC_URL, start).await.unwrap();
-    // let final_frontier = orchard_frontier_at_height(GRPC_URL, end).await.unwrap();
+    let init_frontier = fetch_orchard_frontier_at_height(GRPC_URL, start - 1).await.unwrap();
 
     // create the tree and initialize it to the initial frontier
+    // This also gives us the position to start adding to the tree
     let mut tree = OrchardCommitmentTree::new(OrchardMemoryShardStore::empty(), MAX_CHECKPOINTS);
+    let mut start_position = Position::from(0);
+
     if let Some(frontier) = init_frontier.take() {
-        tree.insert_frontier_nodes(frontier, Retention::Ephemeral).unwrap();
+        console::log_1(&format!("Frontier was found for height {}: {:?}", start - 1, frontier).into());
+        start_position = frontier.position() + 1;
+        tree.insert_frontier_nodes(frontier, Retention::Checkpoint {
+            // checkpoint at the block height the frontier was at
+            id: (start - 1).into(),
+            is_marked: false,
+        }).unwrap();
+    } else {
+        // checkpoint the tree at the start
+        let _success = tree.checkpoint(0.into()).unwrap();
     }
-    
-    // discover from which index we should start adding to the commitment tree
-    // this is pretty hacky and we will want to do it differently in the future
-    let first_block = block_range_stream(GRPC_URL, start, start+1).await.next().await.unwrap().unwrap();
-    let start_position = Position::from(first_block.chain_metadata.unwrap().orchard_commitment_tree_size as u64);
 
     console::log_1(&format!("orchard commitment tree starting from position: {:?}", start_position).into());
 
@@ -139,7 +145,7 @@ pub async fn orchard_sync_commitment_tree(start: u32, end: u32) {
         .collect::<Vec<_>>()
         .await;
 
-    commitment_tree::batch_insert_from_actions(&mut tree, start_position, actions, 100);
+    commitment_tree::batch_insert_from_actions(&mut tree, start_position, actions, 10);
 }
 
 pub async fn block_range_stream(base_url: &str, start: u32, end: u32) -> Streaming<CompactBlock> {
@@ -162,7 +168,7 @@ pub async fn block_range_stream(base_url: &str, start: u32, end: u32) -> Streami
     s.get_block_range(range).await.unwrap().into_inner()
 }
 
-pub async fn orchard_frontier_at_height(base_url: &str, height: u32) -> anyhow::Result<OrchardFrontier>  {
+pub async fn fetch_orchard_frontier_at_height(base_url: &str, height: u32) -> anyhow::Result<OrchardFrontier>  {
     let mut s = proto::service::compact_tx_streamer_client::CompactTxStreamerClient::new(
         Client::new(base_url.to_string()),
     );
