@@ -12,19 +12,19 @@ build-rust profile=default_profile: (_check-profile profile) && (build-parallel 
 # Build WASM binary with Parallel feature
 build-parallel profile=default_profile: (_check-profile profile)
     @echo Building with Parallel feature in {{ profile }} mode
-    wasm-pack build -t web  --{{ profile }} --out-dir blockstream/wasm-pkg/parallel --features=parallel
+    wasm-pack build -t web  --{{ profile }} --out-dir demo-page/wasm-pkg/parallel --features=parallel
 
 # Build WASM binary without Parallel feature
 build-no-parallel profile=default_profile: (_check-profile profile)
     @echo Building without Parallel feature in {{ profile }} mode
-    wasm-pack build -t web  --{{ profile }} --out-dir blockstream/wasm-pkg/serial
+    wasm-pack build -t web  --{{ profile }} --out-dir demo-page/wasm-pkg/serial
 
 _check-profile profile:
     @echo {{ if profile =~ "release|debug|profiling" { "" } else { error("Profile must be one of: release|debug|profiling") } }} > /dev/null 2>&1
 
 # Serves the web page using Parcel
 serve:
-    cd blockstream && yarn && yarn parcel index.html
+    cd demo-page && yarn && yarn dev
 
 # Test in headless mode on firefox
 test-headless-firefox +FLAGS:
