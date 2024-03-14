@@ -1,11 +1,10 @@
 import { LwdClient, buildBlockRange } from "./blockstream";
 import { CompactBlock as CompactBlockPb } from "./generated/compact_formats_pb";
-
 let num_concurrency = navigator.hardwareConcurrency;
 console.log("num_concurrency: ", num_concurrency);
 
 const ORCHARD_ACTIVATION = 1687104;
-const START = ORCHARD_ACTIVATION + 10000;
+const START = ORCHARD_ACTIVATION + 15000;
 const END = START + 10000;
 
 let blocks: Map<number, CompactBlockPb> = new Map();
@@ -13,7 +12,12 @@ let blocks: Map<number, CompactBlockPb> = new Map();
 function setupBtnDownload(
   id,
   withTransactions, // callback to call with the downloaded transactions extracted from the blocks
-  { CompactOrchardAction, CompactSaplingOutput, CompactSaplingSpend, CompactTx } // wasm lib to load constructors from
+  {
+    CompactOrchardAction,
+    CompactSaplingOutput,
+    CompactSaplingSpend,
+    CompactTx,
+  }, // wasm lib to load constructors from
 ) {
   // Assign onclick handler + enable the button.
   Object.assign(document.getElementById(id), {
@@ -110,6 +114,7 @@ function setupBtn(id, f) {
   });
 }
 
+
 (async function initSingleThread() {
   const singleThread = await import(
     "./wasm-pkg/serial/zcash_wasm_benchmark.js"
@@ -127,8 +132,26 @@ function setupBtn(id, f) {
   await multiThread.initThreadPool(num_concurrency);
   setupBtn("multiThread", multiThread.proof);
   setupBtn("treeBench", () => multiThread.batch_insert_mock_data(100000, 100));
-  setupBtnDownload("trialDecryptOrchard", multiThread.decrypt_vtx_orchard, multiThread);
-  setupBtnDownload("trialDecryptSapling", multiThread.decrypt_vtx_sapling, multiThread);
-  setupBtnDownload("trialDecryptBoth", multiThread.decrypt_vtx_both, multiThread);
-  setupBtnDownload("treeBenchBlocks", (txns) => multiThread.batch_insert_txn_notes(txns, 1), multiThread);
+  setupBtnDownload(
+    "trialDecryptOrchard",
+    multiThread.decrypt_vtx_orchard,
+    multiThread,
+  );
+  setupBtnDownload(
+    "trialDecryptSapling",
+    multiThread.decrypt_vtx_sapling,
+    multiThread,
+  );
+  setupBtnDownload(
+    "trialDecryptBoth",
+    multiThread.decrypt_vtx_both,
+    multiThread,
+  );
+  setupBtnDownload(
+    "treeBenchBlocks",
+    (txns) => multiThread.batch_insert_txn_notes(txns, 1),
+    multiThread,
+  );
+  setupBtn("orchardFullWasm", () => multiThread.orchard_decrypt_wasm(START, END));
+  setupBtn("saplingFullWasm", () => multiThread.sapling_decrypt_wasm(START, END));
 })();

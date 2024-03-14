@@ -27,7 +27,7 @@ import { BlockRange, BlockID } from "./generated/service_pb";
 
 /// Accepts a start and end block height as numbers and returns a BlockRange object
 /// as defined in the protobuf schema. This can be passed directly to LwdClient.getBlockRange
-function buildBlockRange(startBlockHeight, endBlockHeight) {
+export function buildBlockRange(startBlockHeight, endBlockHeight) {
   let blockRange = new BlockRange();
 
   let start = new BlockID();
@@ -42,4 +42,4 @@ function buildBlockRange(startBlockHeight, endBlockHeight) {
   return blockRange;
 }
 
-export { LwdClient, buildBlockRange };
+export { LwdClient };

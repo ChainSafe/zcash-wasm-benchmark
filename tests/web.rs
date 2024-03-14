@@ -3,29 +3,21 @@
 #![cfg(target_arch = "wasm32")]
 
 extern crate wasm_bindgen_test;
-use rand::rngs::OsRng;
 
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
-use rayon::prelude::*;
 pub use wasm_bindgen_rayon::init_thread_pool;
-use web_sys::console;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-use orchard::{
-    builder::{Builder, BundleType},
-    circuit::ProvingKey,
-    keys::{FullViewingKey, PreparedIncomingViewingKey, Scope, SpendingKey},
-    note_encryption::{CompactAction, OrchardDomain},
-    value::NoteValue,
-    Anchor, Bundle,
-};
-use zcash_note_encryption::try_note_decryption;
+use zcash_wasm_benchmark::PERFORMANCE;
 
-#[wasm_bindgen_test]
-async fn what() {
+const ORCHARD_ACTIVATION: u32 = 1687104;
+const START: u32 = ORCHARD_ACTIVATION + 15000;
+const END: u32 = START + 5000;
+
+async fn init_threadpool() {
     let _ = JsFuture::from(init_thread_pool(
         web_sys::window()
             .unwrap()
@@ -33,60 +25,40 @@ async fn what() {
             .hardware_concurrency() as usize,
     ))
     .await;
+}
 
-    let rng = OsRng;
-    console::log_1(&"start".into());
-    console::time_with_label("Create Valid IVK");
-    let fvk = FullViewingKey::from(&SpendingKey::from_bytes([7; 32]).unwrap());
-    let valid_ivk = fvk.to_ivk(Scope::External);
-    let recipient = valid_ivk.address_at(0u32);
-    let valid_ivk = PreparedIncomingViewingKey::new(&valid_ivk);
-    console::time_end_with_label("Create Valid IVK");
+// #[wasm_bindgen_test]
+// async fn test_decrypt_sapling() {
+//     let _ = JsFuture::from(init_thread_pool(
+//         web_sys::window()
+//             .unwrap()
+//             .navigator()
+//             .hardware_concurrency() as usize,
+//     ))
+//     .await;
 
-    console::time_with_label("Create Invalid IVKs");
-    let invalid_ivks: Vec<_> = (0u32..10240)
-        .into_par_iter()
-        .map(|i| {
-            let mut sk = [0; 32];
-            sk[..4].copy_from_slice(&i.to_le_bytes());
-            let fvk = FullViewingKey::from(&SpendingKey::from_bytes(sk).unwrap());
-            PreparedIncomingViewingKey::new(&fvk.to_ivk(Scope::External))
-        })
-        .collect();
-    console::time_end_with_label("Create Invalid IVKs");
+//     let start = PERFORMANCE.now();
 
-    console::time_with_label("Build PK");
-    let pk = ProvingKey::build();
-    console::time_end_with_label("Build PK");
+//     zcash_wasm_benchmark::sapling_decrypt_wasm(START, END).await;
 
-    console::time_with_label("Create Bundle");
-    let bundle = {
-        let mut builder = Builder::new(BundleType::DEFAULT, Anchor::from_bytes([0; 32]).unwrap());
-        // The builder pads to two actions, and shuffles their order. Add two recipients
-        // so the first action is always decryptable.
-        builder
-            .add_output(None, recipient, NoteValue::from_raw(10), None)
-            .unwrap();
-        builder
-            .add_output(None, recipient, NoteValue::from_raw(10), None)
-            .unwrap();
-        let bundle: Bundle<_, i64> = builder.build(rng).unwrap().unwrap().0;
-        bundle
-            .create_proof(&pk, rng)
-            .unwrap()
-            .apply_signatures(rng, [0; 32], &[])
-            .unwrap()
-    };
-    console::time_end_with_label("Create Bundle");
+//     console_log!("Elapsed: {}", PERFORMANCE.now() - start);
+// }
 
-    console::time_with_label("Compact");
-    let action = bundle.actions().first();
-    let domain = OrchardDomain::for_action(action);
+#[wasm_bindgen_test]
+async fn test_decrypt_orchard() {
+    init_threadpool().await;
 
-    let compact = CompactAction::from(action);
-    console::time_end_with_label("Compact");
+    let start = PERFORMANCE.now();
 
-    console::time_with_label("Decrypt");
-    try_note_decryption(&domain, &valid_ivk, action).unwrap();
-    console::time_end_with_label("Decrypt");
+    zcash_wasm_benchmark::orchard_decrypt_wasm(START, END).await;
+
+    console_log!("Elapsed: {}", PERFORMANCE.now() - start);
+}
+
+#[wasm_bindgen_test]
+async fn test_tree_from_frontier() {
+    init_threadpool().await;
+    let start = PERFORMANCE.now();
+    zcash_wasm_benchmark::orchard_sync_commitment_tree_demo(START, END).await;
+    console_log!("Elapsed: {}", PERFORMANCE.now() - start);
 }

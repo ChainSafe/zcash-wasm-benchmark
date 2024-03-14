@@ -1,34 +1,27 @@
 /**
  * Defines a commitment tree for Orchard that can be used for benchmarking purposes
  */
-use std::convert::TryInto;
-
-use incrementalmerkletree::{Position, Retention};
-use orchard::note::ExtractedNoteCommitment;
+use incrementalmerkletree::{frontier::Frontier, Position, Retention};
 use orchard::tree::MerkleHashOrchard;
 use rayon::prelude::*;
 use shardtree::store::memory::MemoryShardStore;
 use shardtree::ShardTree;
-use wasm_bindgen::prelude::*;
-use web_sys::console;
-use zcash_client_backend::data_api::SAPLING_SHARD_HEIGHT;
 use zcash_primitives::consensus::BlockHeight;
 
-use crate::types::CompactTx;
+use crate::CompactAction;
 
 pub const ORCHARD_SHARD_HEIGHT: u8 = { orchard::NOTE_COMMITMENT_TREE_DEPTH as u8 } / 2;
 
-type OrchardMemoryShardStore = MemoryShardStore<orchard::tree::MerkleHashOrchard, BlockHeight>;
+pub type OrchardMemoryShardStore = MemoryShardStore<orchard::tree::MerkleHashOrchard, BlockHeight>;
 
 pub type OrchardCommitmentTree =
     ShardTree<OrchardMemoryShardStore, { ORCHARD_SHARD_HEIGHT * 2 }, ORCHARD_SHARD_HEIGHT>;
 
-// max number of checkpoints our tree impl can cache to jump back to
-const MAX_CHECKPOINTS: usize = 1;
+pub type OrchardFrontier =
+    Frontier<orchard::tree::MerkleHashOrchard, { orchard::NOTE_COMMITMENT_TREE_DEPTH as u8 }>;
 
 // insert n_nodes integers into a new tree and benchmark it
-#[wasm_bindgen]
-pub fn batch_insert_mock_data(n_nodes: usize, n_genwitness: usize) {
+pub fn batch_insert_mock_data(tree: &mut OrchardCommitmentTree, n_nodes: usize) {
     let mut b = [0_u8; 32];
 
     let commitments = (0..n_nodes)
@@ -38,69 +31,55 @@ pub fn batch_insert_mock_data(n_nodes: usize, n_genwitness: usize) {
         })
         .collect::<Vec<_>>();
 
-    benchmark_tree(&commitments, n_genwitness);
+    parallel_batch_add_commitments(tree, Position::from(0), &commitments);
 }
 
-/// Insert all notes from a batch of transactions into an in-memory commitment tree
-#[wasm_bindgen]
-pub fn batch_insert_txn_notes(vtxs: Box<[CompactTx]>, n_genwitness: usize) {
-    let commitments = vtxs // create an iterator over the commitments to add
+/// Insert all notes from a batch of transactions into an in-memory commitment tree starting from a given position
+pub fn batch_insert_from_actions(
+    tree: &mut OrchardCommitmentTree,
+    start_position: Position,
+    actions: Vec<CompactAction>,
+) {
+    let commitments = actions
         .iter()
-        .flat_map(|tx| {
-            tx.actions
-                .iter()
-                .map(|action| {
-                    ExtractedNoteCommitment::from_bytes(action.cmx.as_ref().try_into().unwrap())
-                        .unwrap()
-                })
-                .collect::<Vec<_>>()
-        })
-        .map(|cmx| MerkleHashOrchard::from_cmx(&cmx))
+        .map(|action| MerkleHashOrchard::from_cmx(&action.cmx()))
         .collect::<Vec<_>>();
 
-    benchmark_tree(&commitments, n_genwitness);
+    parallel_batch_add_commitments(tree, start_position, &commitments);
 }
 
-/// Run a benchmark of the tree with an iterator of commitments to add.
-/// The benchmarks marks the first 10 elements as ones we are interested in maintaining the witnesses for
-/// and then adds the remainder as ephemeral nodes (ones that will be pruned and just serve to update the witness)
-/// n_genwitness is the number of nodes to mark as needing a witness generated for them
-fn benchmark_tree(commitments: &[MerkleHashOrchard], n_genwitness: usize) {
-    let mut tree = OrchardCommitmentTree::new(OrchardMemoryShardStore::empty(), MAX_CHECKPOINTS);
+fn batch_add_commitments(
+    tree: &mut OrchardCommitmentTree,
+    start_position: Position,
+    commitments: &[MerkleHashOrchard],
+) {
+    let values = commitments.iter().enumerate().map(|(i, cmx)| {
+        (
+            *cmx,
+            if i == 0 {
+                Retention::Marked
+            } else {
+                Retention::Ephemeral
+            },
+        )
+    });
+    // note that all leaves are being marked ephemeral and will be pruned out
+    // once they have been used to updated any witnesses the tree is tracking
+    tree.batch_insert(start_position, values).unwrap();
+}
 
-    // checkpoint the tree at the start so it actually builds witnesses as we go
-    // and prunes out ephemeral nodes. Otherwise it will just store all ephemeral nodes and
-    // to hash later which uses more memory and isn't a useful benchmark
-    let _success = tree.checkpoint(0.into()).unwrap();
-
-    console::log_1(
-        &format!("Adding {} commitments to tree", commitments.len())
-            .as_str()
-            .into(),
-    );
-    console::log_1(
-        &format!("Maintaining witness for {} leaves", n_genwitness)
-            .as_str()
-            .into(),
-    );
-
-    // mark the first n_genwitness, the rest as ephemeral
-    let ours = commitments
-        .iter()
-        .clone()
-        .take(n_genwitness)
-        .map(|cmx| (*cmx, Retention::Marked));
-
-    console::time_with_label("Adding our notes to tree");
-    let (last_added, _incomplete) = tree.batch_insert(Position::from(0), ours).unwrap().unwrap();
-    console::time_end_with_label("Adding our notes to tree");
-
-    console::time_with_label("Updating witnesses with rest");
+/// Use rayon to parallelize adding batch of commitments to the tree by building the shards
+/// in parallel then adding them in after
+/// based on the code here (https://github.com/zcash/librustzcash/blob/b3d06ba41904965f3b8165011e14e1d13b3c7b81/zcash_client_sqlite/src/lib.rs#L730)
+fn parallel_batch_add_commitments(
+    tree: &mut OrchardCommitmentTree,
+    start_position: Position,
+    commitments: &[MerkleHashOrchard],
+) {
     // Create subtrees from the note commitments in parallel.
     const CHUNK_SIZE: usize = 1024;
-    let start_position = last_added + 1;
 
-    let subtrees = commitments[n_genwitness..]
+    let subtrees = commitments
         .par_chunks(CHUNK_SIZE)
         .enumerate()
         .filter_map(|(i, chunk)| {
@@ -109,10 +88,19 @@ fn benchmark_tree(commitments: &[MerkleHashOrchard], n_genwitness: usize) {
 
             shardtree::LocatedTree::from_iter(
                 start..end,
-                SAPLING_SHARD_HEIGHT.into(),
-                chunk
-                    .iter()
-                    .map(|cmx| (*cmx, Retention::<BlockHeight>::Ephemeral)),
+                ORCHARD_SHARD_HEIGHT.into(),
+                chunk.iter().enumerate().map(|(i, cmx)| {
+                    (
+                        *cmx,
+                        if i == 0 {
+                            Retention::Marked
+                        } else {
+                            Retention::Ephemeral
+                        },
+                    )
+                }),
+                // note that all leaves marked ephemeral  (all but the first added) will be pruned out
+                // once they have been used to updated any witnesses the tree is tracking
             )
         })
         .map(|res| (res.subtree, res.checkpoints))
@@ -122,13 +110,4 @@ fn benchmark_tree(commitments: &[MerkleHashOrchard], n_genwitness: usize) {
     for (subtree, checkpoints) in subtrees {
         tree.insert_tree(subtree, checkpoints).unwrap();
     }
-    console::time_end_with_label("Updating witnesses with rest");
-
-    console::time_with_label("Calculating witness for first added");
-    let witness = tree
-        .witness_at_checkpoint_depth(Position::from(0), 0)
-        .unwrap();
-    console::time_end_with_label("Calculating witness for first added");
-
-    console::log_1(&format!("Witness {:?}", witness).as_str().into());
 }
