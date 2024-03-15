@@ -115,7 +115,7 @@ pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
     decrypt_compact(ivks.as_slice(), &compact)
 }
 
-const BLOCK_CHUNK_SIZE: usize = 500;
+const BLOCK_CHUNK_SIZE: usize = 100;
 
 #[wasm_bindgen]
 pub async fn orchard_decrypt_continuous(start_height: u32) {
@@ -155,7 +155,14 @@ pub async fn orchard_decrypt_continuous(start_height: u32) {
             })
             .collect::<Vec<_>>();
 
-        decrypt_compact(ivks.as_slice(), &compact);
+        let (tx, rx) = futures_channel::oneshot::channel();
+        rayon::scope(|s| {
+            decrypt_compact(ivks.as_slice(), &compact);
+            tx.send(()).unwrap();
+        });
+        console_log!("awaiting decryption completion");
+        rx.await.unwrap();
+
         blocks_processed += blocks.len();
         actions_processed += compact.len();
         console_log!(

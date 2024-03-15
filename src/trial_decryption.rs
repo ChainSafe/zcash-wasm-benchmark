@@ -152,6 +152,7 @@ where
         return 0;
     }
     let num_parallel = rayon::current_num_threads();
+    console_log!("Scope is {:?}", rayon::current_thread_index());
 
     let start = PERFORMANCE.now();
     let results = compact
