@@ -27,7 +27,6 @@ mod types;
 use futures_util::stream;
 use futures_util::StreamExt;
 use tonic_web_wasm_client::Client;
-use web_sys::console::{self};
 mod proto;
 #[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;
@@ -68,7 +67,7 @@ pub fn set_panic_hook() {
 
 #[wasm_bindgen]
 pub async fn sapling_decrypt_wasm(start: u32, end: u32) -> u32 {
-    console::log_1(&"Starting Sapling Trial Decryption all in WASM".into());
+    console_log!("Starting Sapling Trial Decryption all in WASM");
     let mut client = new_compact_streamer_client(GRPC_URL);
 
     let ivks = crate::trial_decryption::dummy_ivk_sapling(1);
@@ -83,19 +82,16 @@ pub async fn sapling_decrypt_wasm(start: u32, end: u32) -> u32 {
         .map(|x| (SaplingDomain::new(Zip212Enforcement::Off), x.unwrap()))
         .collect::<Vec<_>>()
         .await;
-    console::log_1(
-        &format!(
-            "Download blocks and deserialization: {}ms",
-            PERFORMANCE.now() - dl_blocks,
-        )
-        .into(),
+    console_log!(
+        "Download blocks and deserialization: {}ms",
+        PERFORMANCE.now() - dl_blocks,
     );
     decrypt_compact(ivks.as_slice(), &compact)
 }
 
 #[wasm_bindgen]
 pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
-    console::log_1(&"Starting Orchard Trial Decryption all in WASM".into());
+    console_log!("Starting Orchard Trial Decryption all in WASM");
     let mut client = new_compact_streamer_client(GRPC_URL);
     let ivks = crate::trial_decryption::dummy_ivk_orchard(1);
 
@@ -112,12 +108,9 @@ pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
         })
         .collect::<Vec<_>>()
         .await;
-    console::log_1(
-        &format!(
-            "Download blocks and deserialization: {}ms",
-            PERFORMANCE.now() - dl_block
-        )
-        .into(),
+    console_log!(
+        "Download blocks and deserialization: {}ms",
+        PERFORMANCE.now() - dl_block
     );
     decrypt_compact(ivks.as_slice(), &compact)
 }
@@ -199,13 +192,10 @@ pub async fn orchard_sync_commitment_tree_demo(start: u32, end: u32) {
     let mut start_position = Position::from(0);
 
     if let Some(frontier) = init_frontier.take() {
-        console::log_1(
-            &format!(
-                "Frontier was found for height {}: {:?}",
-                start - 1,
-                frontier
-            )
-            .into(),
+        console_log!(
+            "Frontier was found for height {}: {:?}",
+            start - 1,
+            frontier
         );
         start_position = frontier.position() + 1;
         tree.insert_frontier_nodes(
@@ -221,12 +211,9 @@ pub async fn orchard_sync_commitment_tree_demo(start: u32, end: u32) {
         let _success = tree.checkpoint(0.into()).unwrap();
     }
 
-    console::log_1(
-        &format!(
-            "orchard commitment tree starting from position: {:?}",
-            start_position
-        )
-        .into(),
+    console_log!(
+        "orchard commitment tree starting from position: {:?}",
+        start_position
     );
 
     let stream = block_range_stream(&mut client, start, end).await;
@@ -241,27 +228,21 @@ pub async fn orchard_sync_commitment_tree_demo(start: u32, end: u32) {
         .collect::<Vec<_>>()
         .await;
 
-    console::log_1(&format!("Downloaded and deserialized {} actions", actions.len()).into());
+    console_log!("Downloaded and deserialized {} actions", actions.len());
 
     let update_tree = PERFORMANCE.now();
     commitment_tree::batch_insert_from_actions(&mut tree, start_position, actions);
-    console::log_1(
-        &format!(
-            "Update commitment tree: {}ms",
-            PERFORMANCE.now() - update_tree
-        )
-        .into(),
+    console_log!(
+        "Update commitment tree: {}ms",
+        PERFORMANCE.now() - update_tree
     );
 
     // produce a witness for the first added leaf
     let calc_witness = PERFORMANCE.now();
     let _witness = tree.witness_at_checkpoint_depth(start_position, 0).unwrap();
-    console::log_1(
-        &format!(
-            "Produce witness for leftmost leaf: {}ms",
-            PERFORMANCE.now() - calc_witness
-        )
-        .into(),
+    console_log!(
+        "Produce witness for leftmost leaf: {}ms",
+        PERFORMANCE.now() - calc_witness
     );
 
     // the end frontier should be the witness of the last added commitment
@@ -273,7 +254,7 @@ pub async fn orchard_sync_commitment_tree_demo(start: u32, end: u32) {
         end_frontier.root(),
         tree.root_at_checkpoint_depth(0).unwrap()
     );
-    console::log_1(&format!("✅ Computed root for block {} matches lightwalletd ✅", end).into());
+    console_log!("✅ Computed root for block {} matches lightwalletd ✅", end);
 }
 
 pub async fn block_range_stream(
@@ -281,7 +262,7 @@ pub async fn block_range_stream(
     start: u32,
     end: u32,
 ) -> Streaming<CompactBlock> {
-    console::log_1(&format!("Block Range: [{}, {}]", start, end).into());
+    console_log!("Block Range: [{}, {}]", start, end);
     let start = proto::service::BlockId {
         height: start as u64,
         hash: vec![],
