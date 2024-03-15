@@ -17,14 +17,13 @@ const ORCHARD_ACTIVATION: u32 = 1687104;
 const START: u32 = ORCHARD_ACTIVATION + 15000;
 const END: u32 = START + 5000;
 
-async fn init_threadpool() {
-    let _ = JsFuture::from(init_thread_pool(
+async fn init_threadpool() -> JsFuture {
+    JsFuture::from(init_thread_pool(
         web_sys::window()
             .unwrap()
             .navigator()
             .hardware_concurrency() as usize,
     ))
-    .await;
 }
 
 // #[wasm_bindgen_test]
@@ -44,21 +43,38 @@ async fn init_threadpool() {
 //     console_log!("Elapsed: {}", PERFORMANCE.now() - start);
 // }
 
+// #[wasm_bindgen_test]
+// async fn test_decrypt_orchard() {
+//     let _ = init_threadpool().await;
+
+//     let start = PERFORMANCE.now();
+
+//     zcash_wasm_benchmark::orchard_decrypt_wasm(START, END).await;
+
+//     console_log!("Elapsed: {}", PERFORMANCE.now() - start);
+// }
+
+// #[wasm_bindgen_test]
+// async fn test_tree_from_frontier() {
+//     init_threadpool().await;
+//     let start = PERFORMANCE.now();
+//     zcash_wasm_benchmark::orchard_sync_commitment_tree_demo(START, END).await;
+//     console_log!("Elapsed: {}", PERFORMANCE.now() - start);
+// }
+
 #[wasm_bindgen_test]
-async fn test_decrypt_orchard() {
-    init_threadpool().await;
+async fn test_decrypt_range_orchard() {
+    let _ = JsFuture::from(init_thread_pool(
+        web_sys::window()
+            .unwrap()
+            .navigator()
+            .hardware_concurrency() as usize,
+    ))
+    .await;
 
     let start = PERFORMANCE.now();
 
-    zcash_wasm_benchmark::orchard_decrypt_wasm(START, END).await;
+    zcash_wasm_benchmark::orchard_decrypt_continuous(START).await;
 
-    console_log!("Elapsed: {}", PERFORMANCE.now() - start);
-}
-
-#[wasm_bindgen_test]
-async fn test_tree_from_frontier() {
-    init_threadpool().await;
-    let start = PERFORMANCE.now();
-    zcash_wasm_benchmark::orchard_sync_commitment_tree_demo(START, END).await;
     console_log!("Elapsed: {}", PERFORMANCE.now() - start);
 }

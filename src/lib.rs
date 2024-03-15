@@ -9,6 +9,7 @@ use orchard::note_encryption::CompactAction;
 use orchard::note_encryption::OrchardDomain;
 use proto::compact_formats::CompactBlock;
 use proto::service::compact_tx_streamer_client::CompactTxStreamerClient;
+use proto::service::ChainSpec;
 use sapling::note_encryption::SaplingDomain;
 use sapling::note_encryption::Zip212Enforcement;
 use tonic::Streaming;
@@ -17,6 +18,7 @@ use wasm_bindgen::prelude::*;
 use zcash_primitives::merkle_tree::read_frontier_v0;
 
 use crate::commitment_tree::{OrchardCommitmentTree, OrchardFrontier};
+use futures_util::stream::TryStreamExt;
 
 mod commitment_tree;
 mod proof_gen;
@@ -36,6 +38,10 @@ const GRPC_URL: &str = "http://localhost:443";
 const MAX_CHECKPOINTS: usize = 1;
 
 type WasmGrpcClient = CompactTxStreamerClient<tonic_web_wasm_client::Client>;
+
+macro_rules! console_log {
+    ($($t:tt)*) => (web_sys::console::log_1(&format!($($t)*).into()))
+}
 
 #[wasm_bindgen]
 extern "C" {
@@ -110,15 +116,60 @@ pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
     decrypt_compact(ivks.as_slice(), &compact)
 }
 
+const BLOCK_CHUNK_SIZE: usize = 100;
+
 #[wasm_bindgen]
 pub async fn orchard_decrypt_continuous(start: u32) {
-    console::log_1(
-        &format!(
-            "Start trial decrypting from block height: {} until Head",
-            start
-        )
-        .into(),
+    let mut client = new_compact_streamer_client(GRPC_URL);
+    let ivks = crate::trial_decryption::dummy_ivk_orchard(1);
+
+    let latest_block_id = client
+        .get_latest_block(ChainSpec {})
+        .await
+        .unwrap()
+        .into_inner();
+    console_log!(
+        "Start trial decrypting range block height {} until head {}, total: {}",
+        start,
+        latest_block_id.height,
+        latest_block_id.height - start as u64
     );
+
+    let end = latest_block_id.height;
+
+    let mut chunked_block_stream = block_range_stream(&mut client, start, end as u32)
+        .await
+        .try_chunks(BLOCK_CHUNK_SIZE);
+
+    while let Ok(Some(blocks)) = chunked_block_stream.try_next().await {
+        console_log!(
+            "Pulled {} blocks off GRPC stream in range: [{}, {}]",
+            blocks.len(),
+            blocks.first().unwrap().height,
+            blocks.last().unwrap().height,
+        );
+        let start = PERFORMANCE.now();
+
+        let compact = blocks
+            .iter()
+            .flat_map(|b| b.vtx.iter())
+            .flat_map(|ctx| ctx.actions.iter())
+            .map(|x| {
+                let action: CompactAction = x.try_into().unwrap();
+                let domain = OrchardDomain::for_nullifier(action.nullifier());
+                (domain, action)
+            })
+            .collect::<Vec<_>>();
+
+        decrypt_compact(ivks.as_slice(), &compact);
+        console_log!(
+            "Processing {} blocks in range: [{}, {}] took: {}ms",
+            blocks.len(),
+            blocks.first().unwrap().height,
+            blocks.last().unwrap().height,
+            PERFORMANCE.now() - start
+        );
+    }
 }
 
 /// Retrieve the tree frontier at the given start block height and then process all note commitments
@@ -258,5 +309,7 @@ pub fn new_compact_streamer_client(base_url: &str) -> WasmGrpcClient {
 
 #[wasm_bindgen(start)]
 pub fn start() {
+    let num_parallel = rayon::current_num_threads();
+    console_log!("Rayon available parallelism Num Parallel: {}", num_parallel);
     set_panic_hook();
 }

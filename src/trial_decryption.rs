@@ -147,8 +147,11 @@ where
     <D as Domain>::Recipient: Send + std::fmt::Debug,
     <D as Domain>::IncomingViewingKey: Sync + std::fmt::Debug,
 {
+    if compact.is_empty() {
+        console::log_1(&"No transactions to decrypt".to_string().into());
+        return 0;
+    }
     let num_parallel = rayon::current_num_threads();
-    console::log_1(&format!("Rayon available parallelism Num Parallel: {}", num_parallel).into());
 
     let start = PERFORMANCE.now();
     let results = compact
