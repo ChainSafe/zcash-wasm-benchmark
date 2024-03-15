@@ -152,10 +152,15 @@ where
         return 0;
     }
     let num_parallel = rayon::current_num_threads();
-    console_log!("Scope is {:?}", rayon::current_thread_index());
+
+    if let Some(thread_id) = rayon::current_thread_index() {
+        console_debug!("Spawning par_iter from thread {:?}", thread_id);
+    } else {
+        console_debug!("Spawning par_iter from main thread or non-rayon thread");
+    }
 
     let start = PERFORMANCE.now();
-    let results = compact
+    let valid_results = compact
         .par_chunks(usize::div_ceil(compact.len(), num_parallel))
         .map(|c| {
             let start = PERFORMANCE.now();
@@ -170,6 +175,7 @@ where
             r
         })
         .flatten()
+        .flatten()
         .collect::<Vec<_>>();
 
     console_log!(
@@ -178,7 +184,6 @@ where
         PERFORMANCE.now() - start
     );
 
-    let valid_results = results.into_iter().flatten().collect::<Vec<_>>();
     if valid_results.is_empty() {
         console_debug!("No notes for this address");
     } else {

@@ -14,8 +14,8 @@ wasm_bindgen_test_configure!(run_in_browser);
 use zcash_wasm_benchmark::PERFORMANCE;
 
 const ORCHARD_ACTIVATION: u32 = 1687104;
-const START: u32 = ORCHARD_ACTIVATION + 15000;
-const END: u32 = START + 5000;
+const START: u32 = 1702104;
+const END: u32 = 1712503;
 
 async fn init_threadpool() -> JsFuture {
     JsFuture::from(init_thread_pool(
