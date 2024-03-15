@@ -42,6 +42,12 @@ type WasmGrpcClient = CompactTxStreamerClient<tonic_web_wasm_client::Client>;
 macro_rules! console_log {
     ($($t:tt)*) => (web_sys::console::log_1(&format!($($t)*).into()))
 }
+macro_rules! console_debug {
+    ($($t:tt)*) => (web_sys::console::debug_1(&format!($($t)*).into()))
+}
+
+pub(crate) use console_debug;
+pub(crate) use console_log;
 
 #[wasm_bindgen]
 extern "C" {
@@ -116,7 +122,7 @@ pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
     decrypt_compact(ivks.as_slice(), &compact)
 }
 
-const BLOCK_CHUNK_SIZE: usize = 100;
+const BLOCK_CHUNK_SIZE: usize = 1000;
 
 #[wasm_bindgen]
 pub async fn orchard_decrypt_continuous(start: u32) {
@@ -136,18 +142,13 @@ pub async fn orchard_decrypt_continuous(start: u32) {
     );
 
     let end = latest_block_id.height;
-
+    let overall_start = PERFORMANCE.now();
     let mut chunked_block_stream = block_range_stream(&mut client, start, end as u32)
         .await
         .try_chunks(BLOCK_CHUNK_SIZE);
-
+    let mut blocks_processed = 0;
+    let mut actions_processed = 0;
     while let Ok(Some(blocks)) = chunked_block_stream.try_next().await {
-        console_log!(
-            "Pulled {} blocks off GRPC stream in range: [{}, {}]",
-            blocks.len(),
-            blocks.first().unwrap().height,
-            blocks.last().unwrap().height,
-        );
         let start = PERFORMANCE.now();
 
         let compact = blocks
@@ -162,12 +163,22 @@ pub async fn orchard_decrypt_continuous(start: u32) {
             .collect::<Vec<_>>();
 
         decrypt_compact(ivks.as_slice(), &compact);
+        blocks_processed += blocks.len();
+        actions_processed += compact.len();
         console_log!(
-            "Processing {} blocks in range: [{}, {}] took: {}ms",
+            "Processed {} blocks in range: [{}, {}] took: {}ms\n
+        Total Actions Processed: {}\n
+        Total Blocks Processed: {}\n
+        Blocks until head: {}\n
+        Total Time Elapsed: {}ms",
             blocks.len(),
             blocks.first().unwrap().height,
             blocks.last().unwrap().height,
-            PERFORMANCE.now() - start
+            PERFORMANCE.now() - start,
+            actions_processed,
+            blocks_processed,
+            end - blocks_processed as u64,
+            PERFORMANCE.now() - overall_start
         );
     }
 }

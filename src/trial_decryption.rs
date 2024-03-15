@@ -6,7 +6,7 @@ use rand::rngs::OsRng;
 
 use std::convert::TryInto;
 
-use crate::{types::*, PERFORMANCE};
+use crate::{console_debug, console_log, types::*, PERFORMANCE};
 use ff::Field;
 use rayon::prelude::*;
 use sapling::{
@@ -161,14 +161,11 @@ where
             let start = PERFORMANCE.now();
 
             let r = batch::try_compact_note_decryption(ivks, c);
-            console::log_1(
-                &format!(
-                    "Decrypted chunk {} of {} transactions: {}ms",
-                    i,
-                    c.len(),
-                    PERFORMANCE.now() - start
-                )
-                .into(),
+            console_debug!(
+                "Decrypted chunk {} of {} transactions: {}ms",
+                i,
+                c.len(),
+                PERFORMANCE.now() - start
             );
             r
         })
