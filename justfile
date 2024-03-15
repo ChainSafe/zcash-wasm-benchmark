@@ -27,12 +27,12 @@ serve:
     cd demo-page && yarn && yarn dev
 
 # Test in headless mode on firefox
-test-headless-firefox +FLAGS:
-    wasm-pack test  --release --features=no-bundler --headless --firefox {{FLAGS}}
+test-headless-firefox *FLAGS:
+    wasm-pack test  --release --headless --firefox --features=no-bundler {{FLAGS}}
 
 # Test in headless mode on chrome
-test-headless-chrome +FLAGS:
-    wasm-pack test  --release --features=no-bundler  --headless --chrome {{FLAGS}}
+test-headless-chrome *FLAGS:
+    wasm-pack test  --release --headless --chrome --features=no-bundler {{FLAGS}}
 
 # Clean the WASM binaries and other artifacts from wasm-pack
 clean-wasm:
