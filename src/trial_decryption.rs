@@ -148,7 +148,7 @@ where
     <D as Domain>::IncomingViewingKey: Sync + std::fmt::Debug,
 {
     if compact.is_empty() {
-        console::log_1(&"No transactions to decrypt".to_string().into());
+        console_debug!("No outputs to decrypt");
         return 0;
     }
     let num_parallel = rayon::current_num_threads();
@@ -156,14 +156,13 @@ where
     let start = PERFORMANCE.now();
     let results = compact
         .par_chunks(usize::div_ceil(compact.len(), num_parallel))
-        .enumerate()
-        .map(|(i, c)| {
+        .map(|c| {
             let start = PERFORMANCE.now();
 
             let r = batch::try_compact_note_decryption(ivks, c);
             console_debug!(
-                "Decrypted chunk {} of {} transactions: {}ms",
-                i,
+                "Thread {:?} decrypted {} outputs: {}ms",
+                rayon::current_thread_index(),
                 c.len(),
                 PERFORMANCE.now() - start
             );
@@ -172,20 +171,17 @@ where
         .flatten()
         .collect::<Vec<_>>();
 
-    console::log_1(
-        &format!(
-            "Decrypted Total {} transactions: {}ms",
-            compact.len(),
-            PERFORMANCE.now() - start
-        )
-        .into(),
+    console_log!(
+        "Decrypted Total {} outputs: {}ms",
+        compact.len(),
+        PERFORMANCE.now() - start
     );
 
     let valid_results = results.into_iter().flatten().collect::<Vec<_>>();
     if valid_results.is_empty() {
-        console::log_1(&"No notes for this address".to_string().into());
+        console_debug!("No notes for this address");
     } else {
-        console::log_1(&format!("Notes: {:?}", valid_results).into());
+        console_log!("Notes: {:?}", valid_results);
     }
     compact.len() as u32
 }

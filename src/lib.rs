@@ -115,7 +115,7 @@ pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
     decrypt_compact(ivks.as_slice(), &compact)
 }
 
-const BLOCK_CHUNK_SIZE: usize = 1000;
+const BLOCK_CHUNK_SIZE: usize = 500;
 
 #[wasm_bindgen]
 pub async fn orchard_decrypt_continuous(start_height: u32) {
