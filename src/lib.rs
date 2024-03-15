@@ -125,7 +125,7 @@ pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
 const BLOCK_CHUNK_SIZE: usize = 1000;
 
 #[wasm_bindgen]
-pub async fn orchard_decrypt_continuous(start: u32) {
+pub async fn orchard_decrypt_continuous(start_height: u32) {
     let mut client = new_compact_streamer_client(GRPC_URL);
     let ivks = crate::trial_decryption::dummy_ivk_orchard(1);
 
@@ -136,14 +136,14 @@ pub async fn orchard_decrypt_continuous(start: u32) {
         .into_inner();
     console_log!(
         "Start trial decrypting range block height {} until head {}, total: {}",
-        start,
+        start_height,
         latest_block_id.height,
-        latest_block_id.height - start as u64
+        latest_block_id.height - start_height as u64
     );
 
-    let end = latest_block_id.height;
+    let end_height = latest_block_id.height;
     let overall_start = PERFORMANCE.now();
-    let mut chunked_block_stream = block_range_stream(&mut client, start, end as u32)
+    let mut chunked_block_stream = block_range_stream(&mut client, start_height, end_height as u32)
         .await
         .try_chunks(BLOCK_CHUNK_SIZE);
     let mut blocks_processed = 0;
@@ -177,7 +177,7 @@ pub async fn orchard_decrypt_continuous(start: u32) {
             PERFORMANCE.now() - start,
             actions_processed,
             blocks_processed,
-            end - blocks_processed as u64,
+            end_height - start_height as u64 - blocks_processed as u64,
             PERFORMANCE.now() - overall_start
         );
     }
