@@ -166,10 +166,10 @@ pub async fn orchard_decrypt_continuous(start_height: u32) {
         blocks_processed += blocks.len();
         actions_processed += compact.len();
         console_log!(
-            "Processed {} blocks in range: [{}, {}] took: {}ms\n
-        Total Actions Processed: {}\n
-        Total Blocks Processed: {}\n
-        Blocks until head: {}\n
+            "Processed {} blocks in range: [{}, {}] took: {}ms
+        Total Actions Processed: {}
+        Total Blocks Processed: {}
+        Blocks until head: {}
         Total Time Elapsed: {}ms",
             blocks.len(),
             blocks.first().unwrap().height,
