@@ -10,6 +10,7 @@ use orchard::note_encryption::OrchardDomain;
 use proto::compact_formats::CompactBlock;
 use proto::service::compact_tx_streamer_client::CompactTxStreamerClient;
 use proto::service::ChainSpec;
+use sapling::note_encryption::CompactOutputDescription;
 use sapling::note_encryption::SaplingDomain;
 use sapling::note_encryption::Zip212Enforcement;
 use tonic::Streaming;
@@ -115,12 +116,13 @@ pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
     decrypt_compact(ivks.as_slice(), &compact)
 }
 
-const BLOCK_CHUNK_SIZE: usize = 100;
+const BLOCK_CHUNK_SIZE: usize = 1000;
 
 #[wasm_bindgen]
 pub async fn orchard_decrypt_continuous(start_height: u32) {
     let mut client = new_compact_streamer_client(GRPC_URL);
-    let ivks = crate::trial_decryption::dummy_ivk_orchard(1);
+    let ivks_orchard = crate::trial_decryption::dummy_ivk_orchard(1);
+    let ivks_sapling = crate::trial_decryption::dummy_ivk_sapling(1);
 
     let latest_block_id = client
         .get_latest_block(ChainSpec {})
@@ -141,41 +143,73 @@ pub async fn orchard_decrypt_continuous(start_height: u32) {
         .try_chunks(BLOCK_CHUNK_SIZE);
     let mut blocks_processed = 0;
     let mut actions_processed = 0;
+    let mut outputs_processed = 0;
+
     while let Ok(Some(blocks)) = chunked_block_stream.try_next().await {
         let start = PERFORMANCE.now();
+        let blocks_len = blocks.len();
+        let range_start = blocks.first().unwrap().height;
+        let range_end = blocks.last().unwrap().height;
 
-        let compact = blocks
-            .iter()
-            .flat_map(|b| b.vtx.iter())
-            .flat_map(|ctx| ctx.actions.iter())
-            .map(|x| {
-                let action: CompactAction = x.try_into().unwrap();
-                let domain = OrchardDomain::for_nullifier(action.nullifier());
-                (domain, action)
-            })
-            .collect::<Vec<_>>();
+        let (actions, outputs) = blocks.into_iter().flat_map(|b| b.vtx.into_iter()).fold(
+            (vec![], vec![]),
+            |(mut actions, mut outputs), tx| {
+                let mut act = tx
+                    .actions
+                    .into_iter()
+                    .map(|action| {
+                        let action: CompactAction = action.try_into().unwrap();
+                        let domain = OrchardDomain::for_nullifier(action.nullifier());
+                        (domain, action)
+                    })
+                    .collect::<Vec<_>>();
+                let mut opt = tx
+                    .outputs
+                    .into_iter()
+                    .map(|output| {
+                        let output: CompactOutputDescription = output.try_into().unwrap();
+                        (SaplingDomain::new(Zip212Enforcement::On), output)
+                    })
+                    .collect::<Vec<_>>();
+                actions.append(&mut act);
+                outputs.append(&mut opt);
+                (actions, outputs)
+            },
+        );
+        console_log!(
+            "Time to convert blocks to actions and outputs: {}ms",
+            PERFORMANCE.now() - start
+        );
 
         let (tx, rx) = futures_channel::oneshot::channel();
-        rayon::scope(|s| {
-            decrypt_compact(ivks.as_slice(), &compact);
+        rayon::scope(|_s| {
+            console_log!("Orchard Trial Decryption");
+            decrypt_compact(ivks_orchard.as_slice(), &actions);
+            console_log!("Sapling Trial Decryption");
+            decrypt_compact(ivks_sapling.as_slice(), &outputs);
+
             tx.send(()).unwrap();
         });
-        console_log!("awaiting decryption completion");
+
+        console_debug!("Awaiting decryption completion");
         rx.await.unwrap();
 
-        blocks_processed += blocks.len();
-        actions_processed += compact.len();
+        blocks_processed += blocks_len;
+        actions_processed += actions.len();
+        outputs_processed += outputs.len();
         console_log!(
             "Processed {} blocks in range: [{}, {}] took: {}ms
-        Total Actions Processed: {}
+        Total Orchard Actions Processed: {}
+        Total Sapling Outputs Processed: {}
         Total Blocks Processed: {}
         Blocks until head: {}
         Total Time Elapsed: {}ms",
-            blocks.len(),
-            blocks.first().unwrap().height,
-            blocks.last().unwrap().height,
+            blocks_len,
+            range_start,
+            range_end,
             PERFORMANCE.now() - start,
             actions_processed,
+            outputs_processed,
             blocks_processed,
             end_height - start_height as u64 - blocks_processed as u64,
             PERFORMANCE.now() - overall_start
