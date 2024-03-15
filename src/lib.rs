@@ -8,6 +8,7 @@ use incrementalmerkletree::Retention;
 use orchard::note_encryption::CompactAction;
 use orchard::note_encryption::OrchardDomain;
 use proto::compact_formats::CompactBlock;
+use proto::service::compact_tx_streamer_client::CompactTxStreamerClient;
 use sapling::note_encryption::SaplingDomain;
 use sapling::note_encryption::Zip212Enforcement;
 use tonic::Streaming;
@@ -34,6 +35,8 @@ const GRPC_URL: &str = "http://localhost:443";
 // max number of checkpoints our tree impl can cache to jump back to
 const MAX_CHECKPOINTS: usize = 1;
 
+type WasmGrpcClient = CompactTxStreamerClient<tonic_web_wasm_client::Client>;
+
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_name = "performance")]
@@ -54,11 +57,12 @@ pub fn set_panic_hook() {
 #[wasm_bindgen]
 pub async fn sapling_decrypt_wasm(start: u32, end: u32) -> u32 {
     console::log_1(&"Starting Sapling Trial Decryption all in WASM".into());
+    let mut client = new_compact_streamer_client(GRPC_URL);
 
     let ivks = crate::trial_decryption::dummy_ivk_sapling(1);
 
     let dl_blocks = PERFORMANCE.now();
-    let stream = block_range_stream(GRPC_URL, start, end).await;
+    let stream = block_range_stream(&mut client, start, end).await;
 
     let compact = stream
         .flat_map(|b| stream::iter(b.unwrap().vtx))
@@ -80,11 +84,11 @@ pub async fn sapling_decrypt_wasm(start: u32, end: u32) -> u32 {
 #[wasm_bindgen]
 pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
     console::log_1(&"Starting Orchard Trial Decryption all in WASM".into());
-
+    let mut client = new_compact_streamer_client(GRPC_URL);
     let ivks = crate::trial_decryption::dummy_ivk_orchard(1);
 
     let dl_block = PERFORMANCE.now();
-    let stream = block_range_stream(GRPC_URL, start, end).await;
+    let stream = block_range_stream(&mut client, start, end).await;
 
     let compact = stream
         .flat_map(|b| stream::iter(b.unwrap().vtx))
@@ -106,12 +110,24 @@ pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
     decrypt_compact(ivks.as_slice(), &compact)
 }
 
+#[wasm_bindgen]
+pub async fn orchard_decrypt_continuous(start: u32) {
+    console::log_1(
+        &format!(
+            "Start trial decrypting from block height: {} until Head",
+            start
+        )
+        .into(),
+    );
+}
+
 /// Retrieve the tree frontier at the given start block height and then process all note commitments
 /// included in blocks between start and end.
 /// Finally checks to ensure the computed tree frontier matches the expected frontier at the end block height
 #[wasm_bindgen]
 pub async fn orchard_sync_commitment_tree_demo(start: u32, end: u32) {
-    let init_frontier = fetch_orchard_frontier_at_height(GRPC_URL, start - 1)
+    let mut client = new_compact_streamer_client(GRPC_URL);
+    let init_frontier = fetch_orchard_frontier_at_height(&mut client, start - 1)
         .await
         .unwrap();
 
@@ -151,7 +167,7 @@ pub async fn orchard_sync_commitment_tree_demo(start: u32, end: u32) {
         .into(),
     );
 
-    let stream = block_range_stream(GRPC_URL, start, end).await;
+    let stream = block_range_stream(&mut client, start, end).await;
 
     let actions = stream
         .flat_map(|b| stream::iter(b.unwrap().vtx))
@@ -188,7 +204,7 @@ pub async fn orchard_sync_commitment_tree_demo(start: u32, end: u32) {
 
     // the end frontier should be the witness of the last added commitment
     // this can give us the root of the new tree produced by adding all the commitments
-    let end_frontier = fetch_orchard_frontier_at_height(GRPC_URL, end)
+    let end_frontier = fetch_orchard_frontier_at_height(&mut client, end)
         .await
         .unwrap();
     assert_eq!(
@@ -198,10 +214,11 @@ pub async fn orchard_sync_commitment_tree_demo(start: u32, end: u32) {
     console::log_1(&format!("✅ Computed root for block {} matches lightwalletd ✅", end).into());
 }
 
-pub async fn block_range_stream(base_url: &str, start: u32, end: u32) -> Streaming<CompactBlock> {
-    let mut s = proto::service::compact_tx_streamer_client::CompactTxStreamerClient::new(
-        Client::new(base_url.to_string()),
-    );
+pub async fn block_range_stream(
+    client: &mut WasmGrpcClient,
+    start: u32,
+    end: u32,
+) -> Streaming<CompactBlock> {
     console::log_1(&format!("Block Range: [{}, {}]", start, end).into());
     let start = proto::service::BlockId {
         height: start as u64,
@@ -215,25 +232,28 @@ pub async fn block_range_stream(base_url: &str, start: u32, end: u32) -> Streami
         start: Some(start),
         end: Some(end),
     };
-    s.get_block_range(range).await.unwrap().into_inner()
+    client.get_block_range(range).await.unwrap().into_inner()
 }
 
 pub async fn fetch_orchard_frontier_at_height(
-    base_url: &str,
+    client: &mut WasmGrpcClient,
     height: u32,
 ) -> anyhow::Result<OrchardFrontier> {
-    let mut s = proto::service::compact_tx_streamer_client::CompactTxStreamerClient::new(
-        Client::new(base_url.to_string()),
-    );
     let start = proto::service::BlockId {
         height: height as u64,
         hash: vec![],
     };
-    let pb_tree_state = s.get_tree_state(start).await?.into_inner();
+    let pb_tree_state = client.get_tree_state(start).await?.into_inner();
     let orchard_tree_frontier_bytes = hex::decode(pb_tree_state.orchard_tree)?;
 
     let frontier: OrchardFrontier = read_frontier_v0(Cursor::new(orchard_tree_frontier_bytes))?;
     Ok(frontier)
+}
+
+pub fn new_compact_streamer_client(base_url: &str) -> WasmGrpcClient {
+    proto::service::compact_tx_streamer_client::CompactTxStreamerClient::new(Client::new(
+        base_url.to_string(),
+    ))
 }
 
 #[wasm_bindgen(start)]
