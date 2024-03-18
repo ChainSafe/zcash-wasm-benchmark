@@ -9,6 +9,7 @@ use futures_util::StreamExt;
 use tonic_web_wasm_client::Client;
 mod proto;
 use wasm_bindgen::prelude::*;
+
 #[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;
 
@@ -59,7 +60,5 @@ pub fn new_compact_streamer_client(base_url: &str) -> WasmGrpcClient {
 
 #[wasm_bindgen(start)]
 pub fn start() {
-    let num_parallel = rayon::current_num_threads();
-    console_log!("Rayon available parallelism Num Parallel: {}", num_parallel);
     set_panic_hook();
 }

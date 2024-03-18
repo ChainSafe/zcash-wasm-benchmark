@@ -195,8 +195,9 @@ pub async fn trial_decrypt_range(mut client: WasmGrpcClient, start_height: u32, 
                 PERFORMANCE.now() - overall_start
             );
         }
-        console_log!("GRPC Stream Disconnected, attempting to reconnect");
+        console_log!("GRPC Stream Disconnected or Ended, attempting to reconnect");
     }
+    console_log!("Trial Decryption Complete");
 }
 
 pub(crate) fn dummy_ivk_sapling(
