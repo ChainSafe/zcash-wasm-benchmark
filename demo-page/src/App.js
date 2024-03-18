@@ -92,6 +92,7 @@ export function App() {
                     <select value={shieldedPool} onChange={e => onPoolUpdate(e.target.value)}>
                         <option value="sapling">Sapling</option>
                         <option value="orchard">Orchard</option>
+                        <option value="both">Both</option>
                     </select>  
                 </label>
                 <label>

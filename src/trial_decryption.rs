@@ -1,27 +1,28 @@
+use std::convert::TryInto;
+use wasm_bindgen::prelude::*;
+use web_sys::console;
+use rand::rngs::OsRng;
+use rayon::prelude::*;
+use tonic::Streaming;
+use futures_util::{stream, StreamExt};
+
+use ff::Field;
+use zcash_note_encryption::{batch, BatchDomain, Domain, ShieldedOutput, COMPACT_NOTE_SIZE};
 use orchard::{
     keys::{FullViewingKey, PreparedIncomingViewingKey, Scope, SpendingKey},
     note_encryption::{CompactAction, OrchardDomain},
 };
-use rand::rngs::OsRng;
-
-use std::convert::TryInto;
-
-use crate::{bench_params::{BenchParams, ShieldedPool}, PERFORMANCE};
-use ff::Field;
-use rayon::prelude::*;
 use sapling::{
     keys::SaplingIvk,
     note_encryption::{CompactOutputDescription, SaplingDomain, Zip212Enforcement},
 };
-use wasm_bindgen::prelude::*;
-use web_sys::console;
-use zcash_note_encryption::{batch, BatchDomain, Domain, ShieldedOutput, COMPACT_NOTE_SIZE};
-
-use tonic::Streaming;
-use crate::proto::compact_formats::{CompactBlock, CompactTx};
 
 use crate::block_range_stream::block_range_stream;
-use futures_util::{stream, StreamExt};
+use crate::proto::compact_formats::CompactBlock;
+use crate::{
+    bench_params::{BenchParams, ShieldedPool},
+    PERFORMANCE,
+};
 
 /// This is the top level function that will be called from the JS side
 #[wasm_bindgen]
@@ -39,11 +40,10 @@ pub async fn trial_decryption_bench(params: BenchParams, view_key: Option<Vec<u8
     let block_stream = block_range_stream(&lightwalletd_url, start_block, end_block).await;
 
     match pool {
-        // ShieldedPool::Sapling => decrypt_vtx_sapling(block_stream),
-        ShieldedPool::Orchard => decrypt_vtx_orchard(block_stream),
-        _ => unreachable!(),
-        // ShieldedPool::Both => decrypt_vtx_both(stream),
-    }.await;
+        ShieldedPool::Sapling => decrypt_vtx_sapling(block_stream).await,
+        ShieldedPool::Orchard => decrypt_vtx_orchard(block_stream).await,
+        ShieldedPool::Both => decrypt_vtx_both(block_stream).await,
+    };
 }
 
 async fn decrypt_vtx_orchard(block_stream: Streaming<CompactBlock>) -> u32 {
@@ -55,52 +55,39 @@ async fn decrypt_vtx_orchard(block_stream: Streaming<CompactBlock>) -> u32 {
             let domain = OrchardDomain::for_nullifier(action.nullifier());
             (domain, action)
         })
-        .collect::<Vec<_>>().await; 
-    
-    console::log_1(&format!("Got {} actions", compact.len()).into());
+        .collect::<Vec<_>>()
+        .await;
 
     // TODO: Instead of trying to collect the whole stream here (which will blow out memory if not careful)
     // we need to take chunks and pass these to batch_decrypt_compact
-        
+
     let ivks = dummy_ivk_orchard(1);
     batch_decrypt_compact(&ivks, &compact)
 }
 
-pub fn decrypt_vtx_sapling(vtxs: Box<[CompactTx]>) -> u32 {
-    let start = PERFORMANCE.now();
-    let compact = vtxs
-        .iter()
-        .flat_map(|tx| {
-            tx.outputs
-                .iter()
-                .map(|output| {
-                    let output: CompactOutputDescription = output.try_into().unwrap();
-                    (SaplingDomain::new(Zip212Enforcement::Off), output)
-                })
-                .collect::<Vec<_>>()
+async fn decrypt_vtx_sapling(block_stream: Streaming<CompactBlock>) -> u32 {
+    let compact = block_stream
+        .flat_map(|b| stream::iter(b.unwrap().vtx))
+        .flat_map(|ctx| stream::iter(ctx.outputs))
+        .map(|output| {
+            let output: CompactOutputDescription = output.try_into().unwrap();
+            (SaplingDomain::new(Zip212Enforcement::Off), output)
         })
-        .collect::<Box<[_]>>();
-    console::log_1(&format!("Converting VTX: {}ms", PERFORMANCE.now() - start).into());
+        .collect::<Vec<_>>()
+        .await;
 
     let ivks = dummy_ivk_sapling(1);
-
-    console::log_1(
-        &format!(
-            "Attempting to batch decrypt Sapling {} txns for {} Viewing keys",
-            compact.len(),
-            ivks.len()
-        )
-        .into(),
-    );
-
     batch_decrypt_compact(ivks.as_slice(), &compact)
 }
 
-pub fn decrypt_vtx_both(vtxs: Box<[CompactTx]>) -> u32 {
+async fn decrypt_vtx_both(block_stream: Streaming<CompactBlock>) -> u32 {
     let start = PERFORMANCE.now();
-    let (actions, outputs) =
-        vtxs.iter()
-            .fold((vec![], vec![]), |(mut actions, mut outputs), tx| {
+    
+    let (actions, outputs) = block_stream
+        .flat_map(|b| stream::iter(b.unwrap().vtx))
+        .fold(
+            (vec![], vec![]),
+            |(mut actions, mut outputs), tx| async move {
                 let mut act = tx
                     .actions
                     .iter()
@@ -121,8 +108,10 @@ pub fn decrypt_vtx_both(vtxs: Box<[CompactTx]>) -> u32 {
                 actions.append(&mut act);
                 outputs.append(&mut opt);
                 (actions, outputs)
-            });
-    drop(vtxs);
+            },
+        )
+        .await;
+
     console::log_1(&format!("Converting VTX: {}ms", PERFORMANCE.now() - start).into());
 
     let ivks = dummy_ivk_sapling(1);
@@ -166,6 +155,11 @@ where
 {
     let num_parallel = rayon::current_num_threads();
     console::log_1(&format!("Rayon available parallelism Num Parallel: {}", num_parallel).into());
+    let n_txns = compact.len();
+    console::log_1(&format!("Decrypting batch of size {}", compact.len()).into());
+    if n_txns == 0 {
+        return 0;
+    }
 
     let start = PERFORMANCE.now();
     let results = compact
@@ -177,7 +171,7 @@ where
             let r = batch::try_compact_note_decryption(ivks, c);
             console::log_1(
                 &format!(
-                    "Decrypted chunk {} of {} transactions: {}ms",
+                    "Decrypted chunk {} of size {}: {}ms",
                     i,
                     c.len(),
                     PERFORMANCE.now() - start
@@ -204,7 +198,7 @@ where
     } else {
         console::log_1(&format!("Notes: {:?}", valid_results).into());
     }
-    compact.len() as u32
+    n_txns as u32
 }
 
 pub(crate) fn dummy_ivk_sapling(
