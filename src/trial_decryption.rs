@@ -1,13 +1,13 @@
-use std::convert::TryInto;
-use wasm_bindgen::prelude::*;
-use web_sys::console;
+use futures_util::{stream, StreamExt};
 use rand::rngs::OsRng;
 use rayon::prelude::*;
+use std::convert::TryInto;
 use tonic::Streaming;
-use futures_util::{stream, StreamExt};
+use tonic_web_wasm_client::Client;
+use wasm_bindgen::prelude::*;
+use web_sys::console;
 
 use ff::Field;
-use zcash_note_encryption::{batch, BatchDomain, Domain, ShieldedOutput, COMPACT_NOTE_SIZE};
 use orchard::{
     keys::{FullViewingKey, PreparedIncomingViewingKey, Scope, SpendingKey},
     note_encryption::{CompactAction, OrchardDomain},
@@ -16,9 +16,11 @@ use sapling::{
     keys::SaplingIvk,
     note_encryption::{CompactOutputDescription, SaplingDomain, Zip212Enforcement},
 };
+use zcash_note_encryption::{batch, BatchDomain, Domain, ShieldedOutput, COMPACT_NOTE_SIZE};
 
 use crate::block_range_stream::block_range_stream;
 use crate::proto::compact_formats::CompactBlock;
+use crate::WasmGrpcClient;
 use crate::{
     bench_params::{BenchParams, ShieldedPool},
     PERFORMANCE,
@@ -36,8 +38,8 @@ pub async fn trial_decryption_bench(params: BenchParams, view_key: Option<Vec<u8
         start_block,
         end_block,
     } = params;
-
-    let block_stream = block_range_stream(&lightwalletd_url, start_block, end_block).await;
+    let mut client = WasmGrpcClient::new(Client::new(lightwalletd_url.clone()));
+    let block_stream = block_range_stream(&mut client, start_block, end_block).await;
 
     match pool {
         ShieldedPool::Sapling => decrypt_vtx_sapling(block_stream).await,
@@ -82,7 +84,7 @@ async fn decrypt_vtx_sapling(block_stream: Streaming<CompactBlock>) -> u32 {
 
 async fn decrypt_vtx_both(block_stream: Streaming<CompactBlock>) -> u32 {
     let start = PERFORMANCE.now();
-    
+
     let (actions, outputs) = block_stream
         .flat_map(|b| stream::iter(b.unwrap().vtx))
         .fold(

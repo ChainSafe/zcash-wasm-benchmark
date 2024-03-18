@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 /// Global params shared between the benchmarks
-
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(getter_with_clone)]
@@ -17,7 +16,13 @@ pub struct BenchParams {
 #[wasm_bindgen]
 impl BenchParams {
     #[wasm_bindgen(constructor)]
-    pub fn new(network: String, pool: String, lightwalletd_url: String, start_block: u32, end_block: u32) -> BenchParams {
+    pub fn new(
+        network: String,
+        pool: String,
+        lightwalletd_url: String,
+        start_block: u32,
+        end_block: u32,
+    ) -> BenchParams {
         BenchParams {
             network: Network::from_str(&network).unwrap(),
             pool: ShieldedPool::from_str(&pool).unwrap(),
