@@ -138,87 +138,94 @@ pub async fn orchard_decrypt_continuous(start_height: u32) {
 
     let end_height = latest_block_id.height;
     let overall_start = PERFORMANCE.now();
-    let mut chunked_block_stream = block_range_stream(&mut client, start_height, end_height as u32)
-        .await
-        .try_chunks(BLOCK_CHUNK_SIZE);
+
     let mut blocks_processed = 0;
     let mut actions_processed = 0;
     let mut outputs_processed = 0;
 
-    while let Ok(Some(blocks)) = chunked_block_stream.try_next().await {
-        let start = PERFORMANCE.now();
-        let blocks_len = blocks.len();
-        let range_start = blocks.first().unwrap().height;
-        let range_end = blocks.last().unwrap().height;
+    let mut latest_synced = start_height as u64;
 
-        let (actions, outputs) = blocks.into_iter().flat_map(|b| b.vtx.into_iter()).fold(
-            (vec![], vec![]),
-            |(mut actions, mut outputs), tx| {
-                let mut act = tx
-                    .actions
-                    .into_iter()
-                    .map(|action| {
-                        let action: CompactAction = action.try_into().unwrap();
-                        let domain = OrchardDomain::for_nullifier(action.nullifier());
-                        (domain, action)
-                    })
-                    .collect::<Vec<_>>();
-                let mut opt = tx
-                    .outputs
-                    .into_iter()
-                    .map(|output| {
-                        let output: CompactOutputDescription = output.try_into().unwrap();
-                        (SaplingDomain::new(Zip212Enforcement::On), output)
-                    })
-                    .collect::<Vec<_>>();
-                actions.append(&mut act);
-                outputs.append(&mut opt);
-                (actions, outputs)
-            },
-        );
-        console_log!(
-            "Time to convert blocks to actions and outputs: {}ms",
-            PERFORMANCE.now() - start
-        );
-        blocks_processed += blocks_len;
-        actions_processed += actions.len();
-        outputs_processed += outputs.len();
-        let ivks_orchard = ivks_orchard.clone();
-        let ivks_sapling = ivks_sapling.clone();
+    while latest_synced < end_height {
+        let mut chunked_block_stream =
+            block_range_stream(&mut client, latest_synced as u32, end_height as u32)
+                .await
+                .try_chunks(BLOCK_CHUNK_SIZE);
+        while let Ok(Some(blocks)) = chunked_block_stream.try_next().await {
+            let start = PERFORMANCE.now();
+            let blocks_len = blocks.len();
+            let range_start = blocks.first().unwrap().height;
+            let range_end = blocks.last().unwrap().height;
 
-        let (tx, rx) = futures_channel::oneshot::channel();
-        rayon::scope(|s| {
-            s.spawn(|_| {
-                console_log!("Orchard Trial Decryption");
-                decrypt_compact(ivks_orchard.as_slice(), &actions);
-                console_log!("Sapling Trial Decryption");
-                decrypt_compact(ivks_sapling.as_slice(), &outputs);
-                drop(actions);
-                drop(outputs);
-                tx.send(()).unwrap();
-            })
-        });
+            let (actions, outputs) = blocks.into_iter().flat_map(|b| b.vtx.into_iter()).fold(
+                (vec![], vec![]),
+                |(mut actions, mut outputs), tx| {
+                    let mut act = tx
+                        .actions
+                        .into_iter()
+                        .map(|action| {
+                            let action: CompactAction = action.try_into().unwrap();
+                            let domain = OrchardDomain::for_nullifier(action.nullifier());
+                            (domain, action)
+                        })
+                        .collect::<Vec<_>>();
+                    let mut opt = tx
+                        .outputs
+                        .into_iter()
+                        .map(|output| {
+                            let output: CompactOutputDescription = output.try_into().unwrap();
+                            (SaplingDomain::new(Zip212Enforcement::On), output)
+                        })
+                        .collect::<Vec<_>>();
+                    actions.append(&mut act);
+                    outputs.append(&mut opt);
+                    (actions, outputs)
+                },
+            );
+            console_log!(
+                "Time to convert blocks to actions and outputs: {}ms",
+                PERFORMANCE.now() - start
+            );
+            blocks_processed += blocks_len;
+            actions_processed += actions.len();
+            outputs_processed += outputs.len();
+            let ivks_orchard = ivks_orchard.clone();
+            let ivks_sapling = ivks_sapling.clone();
+            latest_synced = range_end;
+            let (tx, rx) = futures_channel::oneshot::channel();
+            rayon::scope(|s| {
+                s.spawn(|_| {
+                    console_log!("Orchard Trial Decryption");
+                    decrypt_compact(ivks_orchard.as_slice(), &actions);
+                    console_log!("Sapling Trial Decryption");
+                    decrypt_compact(ivks_sapling.as_slice(), &outputs);
+                    drop(actions);
+                    drop(outputs);
+                    tx.send(()).unwrap();
+                })
+            });
 
-        console_debug!("Awaiting decryption completion");
-        rx.await.unwrap();
+            console_debug!("Awaiting decryption completion");
+            rx.await.unwrap();
 
-        console_log!(
-            "Processed {} blocks in range: [{}, {}] took: {}ms
+            console_log!(
+                "Processed {} blocks in range: [{}, {}] took: {}ms
         Total Orchard Actions Processed: {}
         Total Sapling Outputs Processed: {}
         Total Blocks Processed: {}
         Blocks until head: {}
         Total Time Elapsed: {}ms",
-            blocks_len,
-            range_start,
-            range_end,
-            PERFORMANCE.now() - start,
-            actions_processed,
-            outputs_processed,
-            blocks_processed,
-            end_height - start_height as u64 - blocks_processed as u64,
-            PERFORMANCE.now() - overall_start
-        );
+                blocks_len,
+                range_start,
+                range_end,
+                PERFORMANCE.now() - start,
+                actions_processed,
+                outputs_processed,
+                blocks_processed,
+                end_height - start_height as u64 - blocks_processed as u64,
+                PERFORMANCE.now() - overall_start
+            );
+        }
+        console_log!("GRPC Stream Disconnected, attempting to reconnect");
     }
 }
 
