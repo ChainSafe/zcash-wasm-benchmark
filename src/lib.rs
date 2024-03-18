@@ -3,7 +3,9 @@ use wasm_bindgen::prelude::*;
 pub use wasm_bindgen_rayon::init_thread_pool;
 
 mod bench_params;
-mod benchmarks;
+mod commitment_tree;
+mod proof_gen;
+mod trial_decryption;
 mod block_range_stream;
 mod proto;
 mod types;
