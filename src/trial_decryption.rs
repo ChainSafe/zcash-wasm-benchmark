@@ -12,7 +12,7 @@ use orchard::{
     note_encryption::{CompactAction, OrchardDomain},
 };
 
-use crate::{console_debug, console_log, proto::service::ChainSpec, types::*, PERFORMANCE};
+use crate::{console_debug, console_log, PERFORMANCE};
 use sapling::{
     keys::SaplingIvk,
     note_encryption::{CompactOutputDescription, SaplingDomain, Zip212Enforcement},
@@ -117,7 +117,7 @@ pub async fn trial_decrypt_range(mut client: WasmGrpcClient, start_height: u32, 
 
     while latest_synced < end_height as u64 {
         let mut chunked_block_stream =
-            block_range_stream(&mut client, latest_synced as u32, end_height as u32)
+            block_range_stream(&mut client, latest_synced as u32, end_height)
                 .await
                 .try_chunks(BLOCK_CHUNK_SIZE);
         while let Ok(Some(blocks)) = chunked_block_stream.try_next().await {

@@ -4,11 +4,9 @@ mod commitment_tree;
 mod proof_gen;
 mod trial_decryption;
 mod types;
-use futures_util::stream;
-use futures_util::StreamExt;
+
 use tonic_web_wasm_client::Client;
 mod proto;
-use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;
