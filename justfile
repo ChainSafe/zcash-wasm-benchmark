@@ -26,6 +26,10 @@ _check-profile profile:
 serve:
     cd demo-page && yarn && yarn dev
 
+# Serves the web page using Parcel
+build-page:
+    cd demo-page && yarn && yarn build
+
 # Test in headless mode on firefox
 test-headless-firefox *FLAGS:
     wasm-pack test  --release --headless --firefox --features=no-bundler {{FLAGS}}

@@ -1,0 +1,46 @@
+on:
+    # Runs on pushes targeting the default branch
+    push:
+      branches: ['main']
+    # Allows you to run this workflow manually from the Actions tab
+    workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: extractions/setup-just@v1
+
+      - name: Install
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build Wasm
+        run: just build-parallel
+
+      - name: Build page
+        run: just build-page
+
+      deploy:
+        needs: build
+
+        # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
+        permissions:
+        pages: write      # to deploy to Pages
+        id-token: write   # to verify the deployment originates from an appropriate source
+  
+        # Deploy to the github-pages environment
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+    
+        # Specify runner + deployment step
+        runs-on: ubuntu-latest
+        steps:
+            - name: Upload artifact
+              uses: actions/upload-pages-artifact@v1
+              with:
+                path: './demo-page/dist'
+
+            - name: Deploy to GitHub Pages
+              uses: actions/deploy-pages@v1
