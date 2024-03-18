@@ -4,7 +4,6 @@ use crate::WasmGrpcClient;
 use tonic::Streaming;
 
 /// return a stream over a range of blocks.
-/// TODO: this should handle doing multiple requests if the range is too large and gets rejected by the server
 pub async fn block_range_stream(
     client: &mut WasmGrpcClient,
     start: u32,
