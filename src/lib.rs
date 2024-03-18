@@ -116,7 +116,7 @@ pub async fn orchard_decrypt_wasm(start: u32, end: u32) -> u32 {
     decrypt_compact(ivks.as_slice(), &compact)
 }
 
-const BLOCK_CHUNK_SIZE: usize = 1000;
+const BLOCK_CHUNK_SIZE: usize = 250;
 
 #[wasm_bindgen]
 pub async fn orchard_decrypt_continuous(start_height: u32) {
@@ -180,23 +180,28 @@ pub async fn orchard_decrypt_continuous(start_height: u32) {
             "Time to convert blocks to actions and outputs: {}ms",
             PERFORMANCE.now() - start
         );
+        blocks_processed += blocks_len;
+        actions_processed += actions.len();
+        outputs_processed += outputs.len();
+        let ivks_orchard = ivks_orchard.clone();
+        let ivks_sapling = ivks_sapling.clone();
 
         let (tx, rx) = futures_channel::oneshot::channel();
-        rayon::scope(|_s| {
-            console_log!("Orchard Trial Decryption");
-            decrypt_compact(ivks_orchard.as_slice(), &actions);
-            console_log!("Sapling Trial Decryption");
-            decrypt_compact(ivks_sapling.as_slice(), &outputs);
-
-            tx.send(()).unwrap();
+        rayon::scope(|s| {
+            s.spawn(|_| {
+                console_log!("Orchard Trial Decryption");
+                decrypt_compact(ivks_orchard.as_slice(), &actions);
+                console_log!("Sapling Trial Decryption");
+                decrypt_compact(ivks_sapling.as_slice(), &outputs);
+                drop(actions);
+                drop(outputs);
+                tx.send(()).unwrap();
+            })
         });
 
         console_debug!("Awaiting decryption completion");
         rx.await.unwrap();
 
-        blocks_processed += blocks_len;
-        actions_processed += actions.len();
-        outputs_processed += outputs.len();
         console_log!(
             "Processed {} blocks in range: [{}, {}] took: {}ms
         Total Orchard Actions Processed: {}
