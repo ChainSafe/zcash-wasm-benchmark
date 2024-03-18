@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import "./App.css";
-import initWasm, { sapling_decrypt_wasm, initThreadPool } from "../wasm-pkg/parallel";
+import initWasm, { trial_decryption_bench, initThreadPool, BenchParams } from "../wasm-pkg/parallel";
 
 const SAPLING_ACTIVATION = 419200;
-const ORCHARD_ACTIVATION = 653600;
+const ORCHARD_ACTIVATION = 1687104;
 
 const MAINNET_LIGHTWALLETD_PROXY = "http://localhost:443";
 const TESTNET_LIGHTWALLETD_PROXY = "http://testnet.localhost:443";
@@ -22,10 +22,10 @@ export function App() {
     }, []);
 
     // State
-    let [startBlock, setStartBlock] = useState(SAPLING_ACTIVATION);
-    let [endBlock, setEndBlock] = useState(SAPLING_ACTIVATION + 1000);
+    let [startBlock, setStartBlock] = useState(ORCHARD_ACTIVATION + 15000);
+    let [endBlock, setEndBlock] = useState(startBlock + 2000);
     let [network, setNetwork] = useState("mainnet");
-    let [shieldedPool, setShieldedPool] = useState("sapling");
+    let [shieldedPool, setShieldedPool] = useState("orchard");
     let [lightwalletdProxy, setLightwalletdProxy] = useState(MAINNET_LIGHTWALLETD_PROXY);
     let [paymentFrequency, setPaymentFrequency] = useState(0);
     let [proofGenerationSpends, setProofGenerationSpends] = useState(1);
@@ -51,8 +51,18 @@ export function App() {
         }
     }
 
+    function current_params() {
+        return new BenchParams(
+            network,
+            shieldedPool,
+            lightwalletdProxy,
+            startBlock,
+            endBlock,
+        );
+    }
+
     async function runTrialDecryption() {
-        await sapling_decrypt_wasm(startBlock, endBlock);
+        await trial_decryption_bench(current_params());
     }
 
     async function runTreeStateSync() {
@@ -73,7 +83,7 @@ export function App() {
                 <label>
                     Network:
                     <select value={network} onChange={e => onNetworkUpdate(e.target.value)}>
-                        <option value="mainnet">Mainnet</option>
+                        <option value={"mainnet"}>Mainnet</option>
                         <option value="testnet">Testnet</option>
                     </select>   
                 </label>
