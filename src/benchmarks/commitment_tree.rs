@@ -11,16 +11,16 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use incrementalmerkletree::{frontier::Frontier, Position, Retention};
+use orchard::note_encryption::CompactAction;
 use orchard::tree::MerkleHashOrchard;
 use shardtree::store::memory::MemoryShardStore;
 use shardtree::ShardTree;
 use zcash_primitives::consensus::BlockHeight;
 use zcash_primitives::merkle_tree::read_frontier_v0;
 
-use crate::bench_params::BenchParams;
+use crate::bench_params::{BenchParams, ShieldedPool};
 use crate::block_range_stream::block_range_stream;
 use crate::proto;
-use crate::CompactAction;
 use crate::WasmGrpcClient;
 use crate::PERFORMANCE;
 
@@ -41,7 +41,7 @@ pub type OrchardFrontier =
 /// included in blocks between start and end.
 /// Finally checks to ensure the computed tree frontier matches the expected frontier at the end block height
 #[wasm_bindgen]
-pub async fn orchard_sync_commitment_tree_demo(params: BenchParams) {
+pub async fn sync_commitment_tree_bench(params: BenchParams) {
     let BenchParams {
         network,
         pool,
@@ -49,6 +49,12 @@ pub async fn orchard_sync_commitment_tree_demo(params: BenchParams) {
         start_block,
         end_block,
     } = params;
+
+    if pool != ShieldedPool::Orchard {
+        console::log_1(&"This benchmark is only for Orchard".into());
+        return;
+    }
+
     let mut client = WasmGrpcClient::new(Client::new(lightwalletd_url.clone()));
 
     let init_frontier = fetch_orchard_frontier_at_height(&mut client, start_block - 1)

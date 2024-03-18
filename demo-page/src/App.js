@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import "./App.css";
-import initWasm, { trial_decryption_bench, initThreadPool, BenchParams } from "../wasm-pkg/parallel";
+import initWasm, { trial_decryption_bench, generate_proof_bench, sync_commitment_tree_bench, initThreadPool, BenchParams } from "../wasm-pkg/parallel";
 
 const SAPLING_ACTIVATION = 419200;
 const ORCHARD_ACTIVATION = 1687104;
@@ -66,10 +66,11 @@ export function App() {
     }
 
     async function runTreeStateSync() {
+        sync_commitment_tree_bench(current_params());
     }
 
     async function runProofGeneration() {
-
+        generate_orchard_proof(current_params(), proofGenerationSpends)
     }
 
     return (

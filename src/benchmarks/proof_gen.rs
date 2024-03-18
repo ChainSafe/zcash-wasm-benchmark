@@ -7,13 +7,19 @@ use orchard::{
 };
 use rand::rngs::OsRng;
 
+use crate::bench_params::{BenchParams, ShieldedPool};
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 // The following code is mostly copy pasta of benchmarks from orchard repo: https://github.com/zcash/orchard/blob/main/benches/
 
 #[wasm_bindgen]
-pub fn proof() {
+pub fn generate_proof_bench(params: BenchParams, n_spends: u32) {
+    if params.pool != ShieldedPool::Orchard {
+        console::log_1(&"This benchmark is only for Orchard".into());
+        return;
+    }
+
     let rng = OsRng;
     console::log_1(&"Starting Proof".into());
 
@@ -25,9 +31,6 @@ pub fn proof() {
     let recipient = FullViewingKey::from(&sk).address_at(0u32, Scope::External);
     console::time_end_with_label("Recipient Viewing Key");
 
-    console::time_with_label("Create Verifying Key");
-    let vk = VerifyingKey::build();
-    console::time_end_with_label("Create Verifying Key");
     console::time_with_label("Create Proving Key");
     let pk = ProvingKey::build();
     console::time_end_with_label("Create Proving Key");
@@ -49,36 +52,11 @@ pub fn proof() {
         (bundle, instances)
     };
 
-    let recipients_range = 1..=4;
-    // Proving
-    {
-        for num_recipients in recipients_range.clone() {
-            let (bundle, instances) = create_bundle(num_recipients);
-            console::time_with_label(&format!("Proving with {} recipients", num_recipients));
-            bundle
-                .authorization()
-                .create_proof(&pk, &instances, rng)
-                .unwrap();
-            console::time_end_with_label(&format!("Proving with {} recipients", num_recipients));
-        }
-    }
-
-    // Verifying
-    {
-        for num_recipients in recipients_range {
-            let (bundle, instances) = create_bundle(num_recipients);
-            let bundle = bundle
-                .create_proof(&pk, rng)
-                .unwrap()
-                .apply_signatures(rng, [0; 32], &[])
-                .unwrap();
-            assert!(bundle.verify_proof(&vk).is_ok());
-            console::time_with_label(&format!("Verify Proof with {} recipients", num_recipients));
-            let _ = bundle.authorization().proof().verify(&vk, &instances);
-            console::time_end_with_label(&format!(
-                "Verify Proof with {} recipients",
-                num_recipients
-            ));
-        }
-    }
+    let (bundle, instances) = create_bundle(n_spends);
+    console::time_with_label(&format!("Proving with {} spends", n_spends));
+    bundle
+        .authorization()
+        .create_proof(&pk, &instances, rng)
+        .unwrap();
+    console::time_end_with_label(&format!("Proving with {} spends", n_spends));
 }
