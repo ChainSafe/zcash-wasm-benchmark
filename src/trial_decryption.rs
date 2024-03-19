@@ -18,11 +18,11 @@ use crate::WasmGrpcClient;
 
 /// This is the top level function that will be called from the JS side
 #[wasm_bindgen]
-pub async fn trial_decryption_bench(params: BenchParams, view_key: Option<Vec<u8>>) {
+pub async fn trial_decryption_bench(params: BenchParams, _view_key: Option<Vec<u8>>) {
     console::log_1(&format!("Starting Trial Decryption with params: {:?}", params).into());
 
     let BenchParams {
-        network,
+        network: _,
         pool,
         lightwalletd_url,
         start_block,
@@ -52,9 +52,7 @@ pub async fn trial_decrypt_range(
         let (tx, rx) = futures_channel::oneshot::channel();
         rayon::scope(|s| {
             s.spawn(|_| {
-                console_log!("Orchard Trial Decryption");
                 batch_decrypt_compact(ivks_orchard.as_slice(), &actions);
-                console_log!("Sapling Trial Decryption");
                 batch_decrypt_compact(ivks_sapling.as_slice(), &outputs);
                 drop(actions);
                 drop(outputs);

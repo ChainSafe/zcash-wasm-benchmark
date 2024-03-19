@@ -65,7 +65,7 @@ export function App() {
     }
 
     async function runProofGeneration() {
-        generate_orchard_proof(current_params(), proofGenerationSpends)
+        generate_proof_bench(current_params(), proofGenerationSpends)
     }
 
     return (
@@ -138,7 +138,7 @@ export function App() {
 
             <div>
                 <h2>Proof Generation</h2>
-                <p>Generate a proof for a dummy transaction with the given number of spends</p>
+                <p>Generate a proof for a dummy transaction with the given number of spends. Note the shielded pool must be set to Orchard for this test.</p>
                 <label>
                     Number of spends:
                     <input type="number" value={proofGenerationSpends} onChange={e => setProofGenerationSpends(Number(e.target.value))} />

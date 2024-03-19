@@ -50,7 +50,7 @@ pub type SaplingFrontier = Frontier<sapling::Node, { sapling::NOTE_COMMITMENT_TR
 #[wasm_bindgen]
 pub async fn sync_commitment_tree_bench(params: BenchParams) {
     let BenchParams {
-        network,
+        network: _,
         pool,
         lightwalletd_url,
         start_block,
