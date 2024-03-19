@@ -28,7 +28,7 @@ use crate::WasmGrpcClient;
 use crate::PERFORMANCE;
 
 pub const ORCHARD_SHARD_HEIGHT: u8 = { orchard::NOTE_COMMITMENT_TREE_DEPTH as u8 } / 2;
-pub const SAPLING_SHARD_HEIGHT: u8 = { sapling::NOTE_COMMITMENT_TREE_DEPTH as u8 } / 2;
+pub const SAPLING_SHARD_HEIGHT: u8 = { sapling::NOTE_COMMITMENT_TREE_DEPTH } / 2;
 
 // max number of checkpoints our tree impl can cache to jump back to
 const MAX_CHECKPOINTS: usize = 1;
@@ -42,7 +42,7 @@ pub type OrchardFrontier =
 pub type SaplingMemoryShardStore = MemoryShardStore<sapling::Node, BlockHeight>;
 pub type SaplingCommitmentTree =
     ShardTree<SaplingMemoryShardStore, { SAPLING_SHARD_HEIGHT * 2 }, SAPLING_SHARD_HEIGHT>;
-pub type SaplingFrontier = Frontier<sapling::Node, { sapling::NOTE_COMMITMENT_TREE_DEPTH as u8 }>;
+pub type SaplingFrontier = Frontier<sapling::Node, { sapling::NOTE_COMMITMENT_TREE_DEPTH }>;
 
 /// Retrieve the tree frontier at the given start block height and then process all note commitments
 /// included in blocks between start and end.
