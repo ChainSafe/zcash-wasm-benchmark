@@ -4,14 +4,14 @@
 use std::convert::TryInto;
 use std::io::Cursor;
 
-use futures_util::{stream, StreamExt};
+use futures_util::{pin_mut, stream, StreamExt};
 use rayon::prelude::*;
 use tonic_web_wasm_client::Client;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use incrementalmerkletree::{frontier::Frontier, Position, Retention};
-use orchard::note_encryption::CompactAction;
+use orchard::note_encryption::{CompactAction, OrchardDomain};
 use orchard::tree::MerkleHashOrchard;
 use shardtree::store::memory::MemoryShardStore;
 use shardtree::ShardTree;
@@ -19,7 +19,7 @@ use zcash_primitives::consensus::BlockHeight;
 use zcash_primitives::merkle_tree::read_frontier_v0;
 
 use crate::bench_params::{BenchParams, ShieldedPool};
-use crate::block_range_stream::block_range_stream;
+use crate::block_range_stream::block_contents_batch_stream;
 use crate::console_log;
 use crate::proto;
 use crate::WasmGrpcClient;
@@ -63,6 +63,12 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
         .await
         .unwrap();
 
+    // the end frontier should be the witness of the last added commitment
+    // this is used to check the sync matches the network
+    let end_frontier = fetch_orchard_frontier_at_height(&mut client, end_block)
+        .await
+        .unwrap();
+
     // create the tree and initialize it to the initial frontier
     // This also gives us the position to start adding to the tree
     let mut tree = OrchardCommitmentTree::new(OrchardMemoryShardStore::empty(), MAX_CHECKPOINTS);
@@ -93,25 +99,17 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
         start_position
     );
 
-    let block_stream = block_range_stream(&mut client, start_block, end_block).await;
+    let s = block_contents_batch_stream(client, pool, start_block, end_block, block_batch_size);
+    pin_mut!(s);
 
-    let actions = block_stream
-        .flat_map(|b| stream::iter(b.unwrap().vtx))
-        .flat_map(|ctx| stream::iter(ctx.actions))
-        .map(|x| {
-            let action: CompactAction = x.try_into().unwrap();
-            action
-        })
-        .collect::<Vec<_>>()
-        .await;
-
-    console_log!("Downloaded and deserialized {} actions", actions.len());
-    let update_tree = PERFORMANCE.now();
-    batch_insert_from_actions(&mut tree, start_position, actions);
-    console_log!(
-        "Update commitment tree: {}ms",
-        PERFORMANCE.now() - update_tree
-    );
+    while let Some((actions, _outputs)) = s.next().await {
+        let update_tree = PERFORMANCE.now();
+        batch_insert_from_actions(&mut tree, start_position, actions);
+        console_log!(
+            "Update commitment tree: {}ms",
+            PERFORMANCE.now() - update_tree
+        );
+    }
 
     // produce a witness for the first added leaf
     let calc_witness = PERFORMANCE.now();
@@ -121,11 +119,6 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
         PERFORMANCE.now() - calc_witness
     );
 
-    // the end frontier should be the witness of the last added commitment
-    // this can give us the root of the new tree produced by adding all the commitments
-    let end_frontier = fetch_orchard_frontier_at_height(&mut client, end_block)
-        .await
-        .unwrap();
     assert_eq!(
         end_frontier.root(),
         tree.root_at_checkpoint_depth(0).unwrap()
@@ -151,52 +144,18 @@ async fn fetch_orchard_frontier_at_height(
     Ok(frontier)
 }
 
-// insert n_nodes integers into a new tree and benchmark it
-fn batch_insert_mock_data(tree: &mut OrchardCommitmentTree, n_nodes: usize) {
-    let mut b = [0_u8; 32];
-
-    let commitments = (0..n_nodes)
-        .map(move |i| {
-            b[..4].copy_from_slice(&i.to_be_bytes());
-            MerkleHashOrchard::from_bytes(&b).unwrap()
-        })
-        .collect::<Vec<_>>();
-
-    parallel_batch_add_commitments(tree, Position::from(0), &commitments);
-}
-
 /// Insert all notes from a batch of transactions into an in-memory commitment tree starting from a given position
 fn batch_insert_from_actions(
     tree: &mut OrchardCommitmentTree,
     start_position: Position,
-    actions: Vec<CompactAction>,
+    actions: Vec<(OrchardDomain, CompactAction)>,
 ) {
     let commitments = actions
         .iter()
-        .map(|action| MerkleHashOrchard::from_cmx(&action.cmx()))
+        .map(|action| MerkleHashOrchard::from_cmx(&action.1.cmx()))
         .collect::<Vec<_>>();
 
     parallel_batch_add_commitments(tree, start_position, &commitments);
-}
-
-fn batch_add_commitments(
-    tree: &mut OrchardCommitmentTree,
-    start_position: Position,
-    commitments: &[MerkleHashOrchard],
-) {
-    let values = commitments.iter().enumerate().map(|(i, cmx)| {
-        (
-            *cmx,
-            if i == 0 {
-                Retention::Marked
-            } else {
-                Retention::Ephemeral
-            },
-        )
-    });
-    // note that all leaves are being marked ephemeral and will be pruned out
-    // once they have been used to updated any witnesses the tree is tracking
-    tree.batch_insert(start_position, values).unwrap();
 }
 
 /// Use rayon to parallelize adding batch of commitments to the tree by building the shards
