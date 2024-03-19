@@ -11,20 +11,17 @@ pub use wasm_bindgen_rayon::init_thread_pool;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-use zcash_wasm_benchmark::PERFORMANCE;
+// const ORCHARD_ACTIVATION: u32 = 1687104;
+// const START: u32 = 1702104;
+// const END: u32 = 1712503;
 
-const ORCHARD_ACTIVATION: u32 = 1687104;
-const START: u32 = ORCHARD_ACTIVATION + 15000;
-const END: u32 = START + 5000;
-
-async fn init_threadpool() {
-    let _ = JsFuture::from(init_thread_pool(
+async fn init_threadpool() -> JsFuture {
+    JsFuture::from(init_thread_pool(
         web_sys::window()
             .unwrap()
             .navigator()
             .hardware_concurrency() as usize,
     ))
-    .await;
 }
 
 // #[wasm_bindgen_test]
@@ -44,21 +41,38 @@ async fn init_threadpool() {
 //     console_log!("Elapsed: {}", PERFORMANCE.now() - start);
 // }
 
-#[wasm_bindgen_test]
-async fn test_decrypt_orchard() {
-    init_threadpool().await;
+// #[wasm_bindgen_test]
+// async fn test_decrypt_orchard() {
+//     let _ = init_threadpool().await;
 
-    let start = PERFORMANCE.now();
+//     let start = PERFORMANCE.now();
 
-    zcash_wasm_benchmark::orchard_decrypt_wasm(START, END).await;
+//     zcash_wasm_benchmark::orchard_decrypt_wasm(START, END).await;
 
-    console_log!("Elapsed: {}", PERFORMANCE.now() - start);
-}
+//     console_log!("Elapsed: {}", PERFORMANCE.now() - start);
+// }
 
-#[wasm_bindgen_test]
-async fn test_tree_from_frontier() {
-    init_threadpool().await;
-    let start = PERFORMANCE.now();
-    zcash_wasm_benchmark::orchard_sync_commitment_tree_demo(START, END).await;
-    console_log!("Elapsed: {}", PERFORMANCE.now() - start);
-}
+// #[wasm_bindgen_test]
+// async fn test_tree_from_frontier() {
+//     init_threadpool().await;
+//     let start = PERFORMANCE.now();
+//     zcash_wasm_benchmark::orchard_sync_commitment_tree_demo(START, END).await;
+//     console_log!("Elapsed: {}", PERFORMANCE.now() - start);
+// }
+
+// #[wasm_bindgen_test]
+// async fn test_decrypt_range_orchard() {
+//     let _ = JsFuture::from(init_thread_pool(
+//         web_sys::window()
+//             .unwrap()
+//             .navigator()
+//             .hardware_concurrency() as usize,
+//     ))
+//     .await;
+
+//     let start = PERFORMANCE.now();
+
+//     zcash_wasm_benchmark::orchard_decrypt_continuous(START).await;
+
+//     console_log!("Elapsed: {}", PERFORMANCE.now() - start);
+// }

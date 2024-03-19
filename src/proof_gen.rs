@@ -1,6 +1,6 @@
 use orchard::{
     builder::{Builder, BundleType},
-    circuit::{ProvingKey, VerifyingKey},
+    circuit::ProvingKey,
     keys::{FullViewingKey, Scope, SpendingKey},
     value::NoteValue,
     Anchor, Bundle,
