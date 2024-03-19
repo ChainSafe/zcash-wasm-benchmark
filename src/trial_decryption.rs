@@ -37,12 +37,7 @@ pub async fn trial_decryption_bench(params: BenchParams, view_key: Option<Vec<u8
     } = params;
     let client = WasmGrpcClient::new(Client::new(lightwalletd_url.clone()));
 
-    match pool {
-        ShieldedPool::Sapling => unimplemented!(),
-        ShieldedPool::Orchard => unimplemented!(),
-        ShieldedPool::Both => trial_decrypt_range(client, start_block, end_block),
-    }
-    .await;
+    trial_decrypt_range(client, pool, start_block, end_block).await;
 }
 
 pub(crate) fn batch_decrypt_compact<D: BatchDomain, Output: ShieldedOutput<D, COMPACT_NOTE_SIZE>>(
@@ -102,11 +97,15 @@ where
 
 const BLOCK_CHUNK_SIZE: usize = 250;
 
-pub async fn trial_decrypt_range(mut client: WasmGrpcClient, start_height: u32, end_height: u32) {
+pub async fn trial_decrypt_range(
+    mut client: WasmGrpcClient,
+    pool: ShieldedPool,
+    start_height: u32,
+    end_height: u32,
+) {
     let ivks_orchard = crate::trial_decryption::dummy_ivk_orchard(1);
     let ivks_sapling = crate::trial_decryption::dummy_ivk_sapling(1);
 
-    // let end_height = latest_block_id.height;
     let overall_start = PERFORMANCE.now();
 
     let mut blocks_processed = 0;
@@ -129,23 +128,29 @@ pub async fn trial_decrypt_range(mut client: WasmGrpcClient, start_height: u32, 
             let (actions, outputs) = blocks.into_iter().flat_map(|b| b.vtx.into_iter()).fold(
                 (vec![], vec![]),
                 |(mut actions, mut outputs), tx| {
-                    let mut act = tx
-                        .actions
-                        .into_iter()
-                        .map(|action| {
-                            let action: CompactAction = action.try_into().unwrap();
-                            let domain = OrchardDomain::for_nullifier(action.nullifier());
-                            (domain, action)
-                        })
-                        .collect::<Vec<_>>();
-                    let mut opt = tx
-                        .outputs
-                        .into_iter()
-                        .map(|output| {
-                            let output: CompactOutputDescription = output.try_into().unwrap();
-                            (SaplingDomain::new(Zip212Enforcement::On), output)
-                        })
-                        .collect::<Vec<_>>();
+                    let mut act = if pool.sync_orchard() {
+                        tx.actions
+                            .into_iter()
+                            .map(|action| {
+                                let action: CompactAction = action.try_into().unwrap();
+                                let domain = OrchardDomain::for_nullifier(action.nullifier());
+                                (domain, action)
+                            })
+                            .collect::<Vec<_>>()
+                    } else {
+                        vec![]
+                    };
+                    let mut opt = if pool.sync_sapling() {
+                        tx.outputs
+                            .into_iter()
+                            .map(|output| {
+                                let output: CompactOutputDescription = output.try_into().unwrap();
+                                (SaplingDomain::new(Zip212Enforcement::On), output)
+                            })
+                            .collect::<Vec<_>>()
+                    } else {
+                        vec![]
+                    };
                     actions.append(&mut act);
                     outputs.append(&mut opt);
                     (actions, outputs)
@@ -182,7 +187,7 @@ pub async fn trial_decrypt_range(mut client: WasmGrpcClient, start_height: u32, 
         Total Orchard Actions Processed: {}
         Total Sapling Outputs Processed: {}
         Total Blocks Processed: {}
-        Blocks until head: {}
+        Blocks remaining: {}
         Total Time Elapsed: {}ms",
                 blocks_len,
                 range_start,

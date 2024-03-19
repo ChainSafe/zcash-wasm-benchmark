@@ -23,9 +23,9 @@ export function App() {
 
     // State
     let [startBlock, setStartBlock] = useState(ORCHARD_ACTIVATION + 15000);
-    let [endBlock, setEndBlock] = useState(startBlock + 2000);
+    let [endBlock, setEndBlock] = useState(startBlock + 10000);
     let [network, setNetwork] = useState("mainnet");
-    let [shieldedPool, setShieldedPool] = useState("orchard");
+    let [shieldedPool, setShieldedPool] = useState("both");
     let [lightwalletdProxy, setLightwalletdProxy] = useState(MAINNET_LIGHTWALLETD_PROXY);
     let [paymentFrequency, setPaymentFrequency] = useState(0);
     let [proofGenerationSpends, setProofGenerationSpends] = useState(1);
@@ -42,13 +42,6 @@ export function App() {
 
     function onPoolUpdate(pool) {
         setShieldedPool(pool);
-        if (pool === "sapling") {
-            setStartBlock(SAPLING_ACTIVATION);
-            setEndBlock(SAPLING_ACTIVATION + 1000);
-        } else {
-            setStartBlock(ORCHARD_ACTIVATION);
-            setEndBlock(ORCHARD_ACTIVATION + 1000);
-        }
     }
 
     function current_params() {

@@ -48,6 +48,24 @@ pub enum ShieldedPool {
     Both,
 }
 
+impl ShieldedPool {
+    pub fn sync_sapling(&self) -> bool {
+        match self {
+            ShieldedPool::Sapling => true,
+            ShieldedPool::Orchard => false,
+            ShieldedPool::Both => true,
+        }
+    }
+
+    pub fn sync_orchard(&self) -> bool {
+        match self {
+            ShieldedPool::Sapling => false,
+            ShieldedPool::Orchard => true,
+            ShieldedPool::Both => true,
+        }
+    }
+}
+
 impl FromStr for Network {
     type Err = String;
 
