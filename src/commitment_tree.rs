@@ -102,9 +102,13 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
     let s = block_contents_batch_stream(client, pool, start_block, end_block, block_batch_size);
     pin_mut!(s);
 
+    let mut current_position = start_position; // keep track of where we need to add to the tree
+
     while let Some((actions, _outputs)) = s.next().await {
         let update_tree = PERFORMANCE.now();
-        batch_insert_from_actions(&mut tree, start_position, actions);
+        let added = actions.len() as u64;
+        batch_insert_from_actions(&mut tree, current_position, actions);
+        current_position += added;
         console_log!(
             "Update commitment tree: {}ms",
             PERFORMANCE.now() - update_tree
