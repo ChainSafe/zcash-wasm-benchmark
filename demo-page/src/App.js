@@ -24,6 +24,7 @@ export function App() {
     // State
     let [startBlock, setStartBlock] = useState(ORCHARD_ACTIVATION + 15000);
     let [endBlock, setEndBlock] = useState(startBlock + 10000);
+    let [batchSize, setBatchSize] = useState(250);
     let [network, setNetwork] = useState("mainnet");
     let [shieldedPool, setShieldedPool] = useState("both");
     let [lightwalletdProxy, setLightwalletdProxy] = useState(MAINNET_LIGHTWALLETD_PROXY);
@@ -51,6 +52,7 @@ export function App() {
             lightwalletdProxy,
             startBlock,
             endBlock,
+            batchSize,
         );
     }
 
@@ -100,6 +102,10 @@ export function App() {
                 <label>
                     End Block:
                     <input type="number" value={endBlock} onChange={(e) => setEndBlock(e.target.value)} />
+                </label>
+                <label>
+                    Block batch size:
+                    <input type="number" value={batchSize} onChange={(e) => setBatchSize(e.target.value)} />
                 </label>
             </div>
 

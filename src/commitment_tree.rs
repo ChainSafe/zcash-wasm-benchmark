@@ -20,6 +20,7 @@ use zcash_primitives::merkle_tree::read_frontier_v0;
 
 use crate::bench_params::{BenchParams, ShieldedPool};
 use crate::block_range_stream::block_range_stream;
+use crate::console_log;
 use crate::proto;
 use crate::WasmGrpcClient;
 use crate::PERFORMANCE;
@@ -48,6 +49,7 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
         lightwalletd_url,
         start_block,
         end_block,
+        block_batch_size,
     } = params;
 
     if pool != ShieldedPool::Orchard {
@@ -67,13 +69,10 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
     let mut start_position = Position::from(0);
 
     if let Some(frontier) = init_frontier.take() {
-        console::log_1(
-            &format!(
-                "Frontier was found for height {}: {:?}",
-                start_block - 1,
-                frontier
-            )
-            .into(),
+        console_log!(
+            "Frontier was found for height {}: {:?}",
+            start_block - 1,
+            frontier
         );
         start_position = frontier.position() + 1;
         tree.insert_frontier_nodes(
@@ -89,12 +88,9 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
         let _success = tree.checkpoint(0.into()).unwrap();
     }
 
-    console::log_1(
-        &format!(
-            "orchard commitment tree starting from position: {:?}",
-            start_position
-        )
-        .into(),
+    console_log!(
+        "orchard commitment tree starting from position: {:?}",
+        start_position
     );
 
     let block_stream = block_range_stream(&mut client, start_block, end_block).await;
@@ -109,27 +105,20 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
         .collect::<Vec<_>>()
         .await;
 
-    console::log_1(&format!("Downloaded and deserialized {} actions", actions.len()).into());
-
+    console_log!("Downloaded and deserialized {} actions", actions.len());
     let update_tree = PERFORMANCE.now();
     batch_insert_from_actions(&mut tree, start_position, actions);
-    console::log_1(
-        &format!(
-            "Update commitment tree: {}ms",
-            PERFORMANCE.now() - update_tree
-        )
-        .into(),
+    console_log!(
+        "Update commitment tree: {}ms",
+        PERFORMANCE.now() - update_tree
     );
 
     // produce a witness for the first added leaf
     let calc_witness = PERFORMANCE.now();
     let _witness = tree.witness_at_checkpoint_depth(start_position, 0).unwrap();
-    console::log_1(
-        &format!(
-            "Produce witness for leftmost leaf: {}ms",
-            PERFORMANCE.now() - calc_witness
-        )
-        .into(),
+    console_log!(
+        "Produce witness for leftmost leaf: {}ms",
+        PERFORMANCE.now() - calc_witness
     );
 
     // the end frontier should be the witness of the last added commitment
@@ -141,12 +130,9 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
         end_frontier.root(),
         tree.root_at_checkpoint_depth(0).unwrap()
     );
-    console::log_1(
-        &format!(
-            "✅ Computed root for block {} matches lightwalletd ✅",
-            end_block
-        )
-        .into(),
+    console_log!(
+        "✅ Computed root for block {} matches lightwalletd ✅",
+        end_block
     );
 }
 
