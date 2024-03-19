@@ -1,30 +1,15 @@
-use crate::proto::compact_formats::CompactBlock;
-use crate::proto::service::{BlockId, BlockRange};
-use crate::{WasmGrpcClient, PERFORMANCE};
+use std::convert::TryInto;
 use futures_util::{Stream, TryStreamExt};
 use tonic::Streaming;
 
-use rand::rngs::OsRng;
-use rayon::prelude::*;
-use std::convert::TryInto;
-use tonic_web_wasm_client::Client;
-use wasm_bindgen::prelude::*;
-use web_sys::console;
+use sapling::note_encryption::{CompactOutputDescription, SaplingDomain, Zip212Enforcement};
+use orchard::note_encryption::{CompactAction, OrchardDomain};
 
-use ff::Field;
-use orchard::{
-    keys::{FullViewingKey, PreparedIncomingViewingKey, Scope, SpendingKey},
-    note_encryption::{CompactAction, OrchardDomain},
-};
-
-use crate::{console_debug, console_log};
-use sapling::{
-    keys::SaplingIvk,
-    note_encryption::{CompactOutputDescription, SaplingDomain, Zip212Enforcement},
-};
-use zcash_note_encryption::{batch, BatchDomain, Domain, ShieldedOutput, COMPACT_NOTE_SIZE};
-
-use crate::bench_params::{BenchParams, ShieldedPool};
+use crate::console_log;
+use crate::bench_params::ShieldedPool;
+use crate::proto::compact_formats::CompactBlock;
+use crate::proto::service::{BlockId, BlockRange};
+use crate::{WasmGrpcClient, PERFORMANCE};
 
 /// return a stream over a range of blocks.
 pub async fn block_range_stream(
@@ -122,12 +107,13 @@ pub fn block_contents_batch_stream(
                 yield (actions, outputs);
 
                 console_log!(
-                    "Processed {} blocks in range: [{}, {}] took: {}ms
-            Total Orchard Actions Processed: {}
-            Total Sapling Outputs Processed: {}
-            Total Blocks Processed: {}
-            Blocks remaining: {}
-            Total Time Elapsed: {}ms",
+                    "
+Processed {} blocks in range: [{}, {}] in {}ms
+- Total Orchard Actions Processed: {}
+- Total Sapling Outputs Processed: {}
+- Total Blocks Processed: {}
+- Blocks remaining to sync: {} ({}%)
+- Total Time Elapsed: {}ms",
                     blocks_len,
                     range_start,
                     range_end,
@@ -136,10 +122,11 @@ pub fn block_contents_batch_stream(
                     outputs_processed,
                     blocks_processed,
                     end_height - start_height - blocks_processed as u32,
+                    ((blocks_processed as f64 / (end_height - start_height) as f64) * 100.0).round(),
                     PERFORMANCE.now() - overall_start
                 );
             }
-            console_log!("GRPC Stream Disconnected or Ended, attempting to reconnect");
+            console_log!("GRPC Stream Disconnected or Ended, will reconnect if more blocks needed");
         }
         console_log!("Block contents stream complete");
     }

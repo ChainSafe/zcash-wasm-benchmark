@@ -2,18 +2,15 @@ use core::panic;
 /**
  * Defines a commitment tree for Orchard that can be used for benchmarking purposes
  */
-use std::convert::TryInto;
-use std::fmt::Debug;
 use std::io::Cursor;
 
-use futures_util::{pin_mut, stream, StreamExt};
+use futures_util::{pin_mut, StreamExt};
 use incrementalmerkletree::Hashable;
 use rayon::prelude::*;
 use sapling::note_encryption::{CompactOutputDescription, SaplingDomain};
 use shardtree::store::ShardStore;
 use tonic_web_wasm_client::Client;
 use wasm_bindgen::prelude::*;
-use web_sys::console;
 
 use incrementalmerkletree::{frontier::Frontier, Position, Retention};
 use orchard::note_encryption::{CompactAction, OrchardDomain};
@@ -23,7 +20,7 @@ use shardtree::ShardTree;
 use zcash_primitives::consensus::BlockHeight;
 use zcash_primitives::merkle_tree::read_frontier_v0;
 
-use crate::bench_params::{BenchParams, ShieldedPool};
+use crate::bench_params::BenchParams;
 use crate::block_range_stream::block_contents_batch_stream;
 use crate::console_log;
 use crate::proto;
@@ -79,7 +76,6 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
     pin_mut!(s);
 
     while let Some((actions, outputs)) = s.next().await {
-        let update_trees = PERFORMANCE.now();
         let (added_orchard, added_sapling) = (actions.len() as u64, outputs.len() as u64);
 
         batch_insert_from_orchard_actions(&mut orchard_tree, orchard_cursor, actions);
@@ -87,11 +83,6 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
 
         orchard_cursor += added_orchard;
         sapling_cursor += added_sapling;
-
-        console_log!(
-            "Update commitment trees: {}ms",
-            PERFORMANCE.now() - update_trees
-        );
     }
 
     // produce a witness for the first added leaf

@@ -1,26 +1,19 @@
-use futures_util::{pin_mut, StreamExt, TryStreamExt};
+use futures_util::{pin_mut, StreamExt};
 use rand::rngs::OsRng;
 use rayon::prelude::*;
-use std::convert::TryInto;
 use tonic_web_wasm_client::Client;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use ff::Field;
-use orchard::{
-    keys::{FullViewingKey, PreparedIncomingViewingKey, Scope, SpendingKey},
-    note_encryption::{CompactAction, OrchardDomain},
-};
+use orchard::keys::{FullViewingKey, PreparedIncomingViewingKey, Scope, SpendingKey};
 
-use crate::{console_debug, console_log, PERFORMANCE};
-use sapling::{
-    keys::SaplingIvk,
-    note_encryption::{CompactOutputDescription, SaplingDomain, Zip212Enforcement},
-};
+use crate::{console_debug, console_log};
+use sapling::keys::SaplingIvk;
 use zcash_note_encryption::{batch, BatchDomain, Domain, ShieldedOutput, COMPACT_NOTE_SIZE};
 
 use crate::bench_params::{BenchParams, ShieldedPool};
-use crate::block_range_stream::{block_contents_batch_stream, block_range_stream};
+use crate::block_range_stream::block_contents_batch_stream;
 use crate::WasmGrpcClient;
 
 /// This is the top level function that will be called from the JS side
@@ -92,36 +85,14 @@ where
     }
     let num_parallel = rayon::current_num_threads();
 
-    if let Some(thread_id) = rayon::current_thread_index() {
-        console_debug!("Spawning par_iter from thread {:?}", thread_id);
-    } else {
-        console_debug!("Spawning par_iter from main thread or non-rayon thread");
-    }
-
-    let start = PERFORMANCE.now();
     let valid_results = compact
         .par_chunks(usize::div_ceil(compact.len(), num_parallel))
         .map(|c| {
-            let start = PERFORMANCE.now();
-            console::log_1(&"Starting decryption".into());
-            let r = batch::try_compact_note_decryption(ivks, c);
-            console_debug!(
-                "Thread {:?} decrypted {} of size: {}ms",
-                rayon::current_thread_index(),
-                c.len(),
-                PERFORMANCE.now() - start
-            );
-            r
+            batch::try_compact_note_decryption(ivks, c)
         })
         .flatten()
         .flatten()
         .collect::<Vec<_>>();
-
-    console_log!(
-        "Decrypted Total {} outputs: {}ms",
-        compact.len(),
-        PERFORMANCE.now() - start
-    );
 
     if valid_results.is_empty() {
         console_debug!("No notes for this address");

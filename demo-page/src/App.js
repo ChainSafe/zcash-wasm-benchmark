@@ -103,6 +103,8 @@ export function App() {
                     End Block:
                     <input type="number" value={endBlock} onChange={(e) => setEndBlock(e.target.value)} />
                 </label>
+                <span >{`${endBlock - startBlock} blocks. Approximately ${Math.round((endBlock - startBlock) * 1.2 / 60 / 24) } days on Zcash mainnet`}</span>
+                <br/>
                 <label>
                     Block batch size:
                     <input type="number" value={batchSize} onChange={(e) => setBatchSize(e.target.value)} />
