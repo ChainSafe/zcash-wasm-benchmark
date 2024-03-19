@@ -2,10 +2,14 @@
  * Defines a commitment tree for Orchard that can be used for benchmarking purposes
  */
 use std::convert::TryInto;
+use std::fmt::Debug;
 use std::io::Cursor;
 
 use futures_util::{pin_mut, stream, StreamExt};
+use incrementalmerkletree::Hashable;
 use rayon::prelude::*;
+use sapling::note_encryption::{CompactOutputDescription, SaplingDomain};
+use shardtree::store::ShardStore;
 use tonic_web_wasm_client::Client;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
@@ -57,11 +61,6 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
         block_batch_size,
     } = params;
 
-    if pool != ShieldedPool::Orchard {
-        console::log_1(&"This benchmark is only for Orchard".into());
-        return;
-    }
-
     let mut client = WasmGrpcClient::new(Client::new(lightwalletd_url.clone()));
 
     let init_frontier = fetch_orchard_frontier_at_height(&mut client, start_block - 1)
@@ -76,7 +75,9 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
 
     // create the tree and initialize it to the initial frontier
     // This also gives us the position to start adding to the tree
-    let mut tree = OrchardCommitmentTree::new(OrchardMemoryShardStore::empty(), MAX_CHECKPOINTS);
+    let mut orchard_tree = OrchardCommitmentTree::new(OrchardMemoryShardStore::empty(), MAX_CHECKPOINTS);
+    let mut sapling_tree = SaplingCommitmentTree::new(SaplingMemoryShardStore::empty(), MAX_CHECKPOINTS);
+
     let mut start_position = Position::from(0);
 
     if let Some(frontier) = init_frontier.take() {
@@ -86,7 +87,7 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
             frontier
         );
         start_position = frontier.position() + 1;
-        tree.insert_frontier_nodes(
+        orchard_tree.insert_frontier_nodes(
             frontier,
             Retention::Checkpoint {
                 id: (start_block - 1).into(),
@@ -96,7 +97,7 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
         .unwrap();
     } else {
         // checkpoint the tree at the start
-        let _success = tree.checkpoint(0.into()).unwrap();
+        let _success = orchard_tree.checkpoint(0.into()).unwrap();
     }
 
     console_log!(
@@ -107,22 +108,28 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
     let s = block_contents_batch_stream(client, pool, start_block, end_block, block_batch_size);
     pin_mut!(s);
 
-    let mut current_position = start_position; // keep track of where we need to add to the tree
+    let mut orchard_tree_cursor = start_position; // keep track of where we need to add to the tree
+    let mut sapling_tree_cursor = Position::from(0);
 
-    while let Some((actions, _outputs)) = s.next().await {
-        let update_tree = PERFORMANCE.now();
-        let added = actions.len() as u64;
-        batch_insert_from_actions(&mut tree, current_position, actions);
-        current_position += added;
+    while let Some((actions, outputs)) = s.next().await {
+        let update_trees = PERFORMANCE.now();
+        let (added_orchard, added_sapling) = (actions.len() as u64, outputs.len() as u64);
+
+        batch_insert_from_orchard_actions(&mut orchard_tree, orchard_tree_cursor, actions);
+        batch_insert_from_sapling_outputs(&mut sapling_tree, sapling_tree_cursor, outputs);
+
+        orchard_tree_cursor += added_orchard;
+        sapling_tree_cursor += added_sapling;
+
         console_log!(
-            "Update commitment tree: {}ms",
-            PERFORMANCE.now() - update_tree
+            "Update commitment trees: {}ms",
+            PERFORMANCE.now() - update_trees
         );
     }
 
     // produce a witness for the first added leaf
     let calc_witness = PERFORMANCE.now();
-    let _witness = tree.witness_at_checkpoint_depth(start_position, 0).unwrap();
+    let _witness = orchard_tree.witness_at_checkpoint_depth(start_position, 0).unwrap();
     console_log!(
         "Produce witness for leftmost leaf: {}ms",
         PERFORMANCE.now() - calc_witness
@@ -130,10 +137,10 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
 
     assert_eq!(
         end_frontier.root(),
-        tree.root_at_checkpoint_depth(0).unwrap()
+        orchard_tree.root_at_checkpoint_depth(0).unwrap()
     );
     console_log!(
-        "✅ Computed root for block {} matches lightwalletd ✅",
+        "✅ Computed orchard root for block {} matches lightwalletd ✅",
         end_block
     );
 }
@@ -154,11 +161,12 @@ async fn fetch_orchard_frontier_at_height(
 }
 
 /// Insert all notes from a batch of transactions into an in-memory commitment tree starting from a given position
-fn batch_insert_from_actions(
+fn batch_insert_from_orchard_actions(
     tree: &mut OrchardCommitmentTree,
     start_position: Position,
     actions: Vec<(OrchardDomain, CompactAction)>,
-) {
+)
+{
     let commitments = actions
         .iter()
         .map(|action| MerkleHashOrchard::from_cmx(&action.1.cmx()))
@@ -167,14 +175,33 @@ fn batch_insert_from_actions(
     parallel_batch_add_commitments(tree, start_position, &commitments);
 }
 
+/// Insert all notes from a batch of transactions into an in-memory commitment tree starting from a given position
+fn batch_insert_from_sapling_outputs(
+    tree: &mut SaplingCommitmentTree,
+    start_position: Position,
+    outputs: Vec<(SaplingDomain, CompactOutputDescription)>,
+)
+{
+    let commitments = outputs
+        .iter()
+        .map(|action| sapling::Node::from_cmu(&action.1.cmu))
+        .collect::<Vec<_>>();
+
+    parallel_batch_add_commitments(tree, start_position, &commitments);
+}
+
 /// Use rayon to parallelize adding batch of commitments to the tree by building the shards
 /// in parallel then adding them in after
 /// based on the code here (https://github.com/zcash/librustzcash/blob/b3d06ba41904965f3b8165011e14e1d13b3c7b81/zcash_client_sqlite/src/lib.rs#L730)
-fn parallel_batch_add_commitments(
-    tree: &mut OrchardCommitmentTree,
+fn parallel_batch_add_commitments<S, H, const DEPTH: u8, const SHARD_HEIGHT: u8>(
+    tree: &mut ShardTree<S, DEPTH, SHARD_HEIGHT>,
     start_position: Position,
-    commitments: &[MerkleHashOrchard],
-) {
+    commitments: &[S::H],
+) 
+    where
+        S: ShardStore<CheckpointId = BlockHeight, H = H>,
+        H: Hashable + Send + Sync + Clone + PartialEq + Copy
+{
     // Create subtrees from the note commitments in parallel.
     const CHUNK_SIZE: usize = 1024;
 
