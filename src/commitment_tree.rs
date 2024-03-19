@@ -1,3 +1,4 @@
+use core::panic;
 /**
  * Defines a commitment tree for Orchard that can be used for benchmarking purposes
  */
@@ -42,10 +43,9 @@ pub type OrchardFrontier =
     Frontier<orchard::tree::MerkleHashOrchard, { orchard::NOTE_COMMITMENT_TREE_DEPTH as u8 }>;
 
 pub type SaplingMemoryShardStore = MemoryShardStore<sapling::Node, BlockHeight>;
-pub type SaplingCommitmentTree = 
+pub type SaplingCommitmentTree =
     ShardTree<SaplingMemoryShardStore, { SAPLING_SHARD_HEIGHT * 2 }, SAPLING_SHARD_HEIGHT>;
-pub type SaplingFrontier =
-    Frontier<sapling::Node, { sapling::NOTE_COMMITMENT_TREE_DEPTH as u8 }>;
+pub type SaplingFrontier = Frontier<sapling::Node, { sapling::NOTE_COMMITMENT_TREE_DEPTH as u8 }>;
 
 /// Retrieve the tree frontier at the given start block height and then process all note commitments
 /// included in blocks between start and end.
@@ -62,10 +62,12 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
     } = params;
 
     let mut client = WasmGrpcClient::new(Client::new(lightwalletd_url.clone()));
+    let (mut orchard_tree, mut orchard_cursor) =
+        bootstrap_orchard_tree_from_lightwalletd(&mut client, start_block - 1).await;
+    let start_position = orchard_cursor;
 
-    let init_frontier = fetch_orchard_frontier_at_height(&mut client, start_block - 1)
-        .await
-        .unwrap();
+    let (mut sapling_tree, mut sapling_cursor) =
+        bootstrap_sapling_tree_from_lightwalletd(&mut client, start_block - 1).await;
 
     // the end frontier should be the witness of the last added commitment
     // this is used to check the sync matches the network
@@ -73,53 +75,18 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
         .await
         .unwrap();
 
-    // create the tree and initialize it to the initial frontier
-    // This also gives us the position to start adding to the tree
-    let mut orchard_tree = OrchardCommitmentTree::new(OrchardMemoryShardStore::empty(), MAX_CHECKPOINTS);
-    let mut sapling_tree = SaplingCommitmentTree::new(SaplingMemoryShardStore::empty(), MAX_CHECKPOINTS);
-
-    let mut start_position = Position::from(0);
-
-    if let Some(frontier) = init_frontier.take() {
-        console_log!(
-            "Frontier was found for height {}: {:?}",
-            start_block - 1,
-            frontier
-        );
-        start_position = frontier.position() + 1;
-        orchard_tree.insert_frontier_nodes(
-            frontier,
-            Retention::Checkpoint {
-                id: (start_block - 1).into(),
-                is_marked: false,
-            },
-        )
-        .unwrap();
-    } else {
-        // checkpoint the tree at the start
-        let _success = orchard_tree.checkpoint(0.into()).unwrap();
-    }
-
-    console_log!(
-        "orchard commitment tree starting from position: {:?}",
-        start_position
-    );
-
     let s = block_contents_batch_stream(client, pool, start_block, end_block, block_batch_size);
     pin_mut!(s);
-
-    let mut orchard_tree_cursor = start_position; // keep track of where we need to add to the tree
-    let mut sapling_tree_cursor = Position::from(0);
 
     while let Some((actions, outputs)) = s.next().await {
         let update_trees = PERFORMANCE.now();
         let (added_orchard, added_sapling) = (actions.len() as u64, outputs.len() as u64);
 
-        batch_insert_from_orchard_actions(&mut orchard_tree, orchard_tree_cursor, actions);
-        batch_insert_from_sapling_outputs(&mut sapling_tree, sapling_tree_cursor, outputs);
+        batch_insert_from_orchard_actions(&mut orchard_tree, orchard_cursor, actions);
+        batch_insert_from_sapling_outputs(&mut sapling_tree, sapling_cursor, outputs);
 
-        orchard_tree_cursor += added_orchard;
-        sapling_tree_cursor += added_sapling;
+        orchard_cursor += added_orchard;
+        sapling_cursor += added_sapling;
 
         console_log!(
             "Update commitment trees: {}ms",
@@ -129,7 +96,9 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
 
     // produce a witness for the first added leaf
     let calc_witness = PERFORMANCE.now();
-    let _witness = orchard_tree.witness_at_checkpoint_depth(start_position, 0).unwrap();
+    let _witness = orchard_tree
+        .witness_at_checkpoint_depth(start_position, 0)
+        .unwrap();
     console_log!(
         "Produce witness for leftmost leaf: {}ms",
         PERFORMANCE.now() - calc_witness
@@ -145,6 +114,62 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
     );
 }
 
+async fn bootstrap_orchard_tree_from_lightwalletd(
+    client: &mut WasmGrpcClient,
+    height: u32,
+) -> (OrchardCommitmentTree, Position) {
+    let mut tree = OrchardCommitmentTree::new(OrchardMemoryShardStore::empty(), MAX_CHECKPOINTS);
+
+    // fetch frontier at the end of the previous block
+    let init_frontier = fetch_orchard_frontier_at_height(client, height)
+        .await
+        .unwrap();
+
+    if let Some(frontier) = init_frontier.take() {
+        console_log!("Frontier was found for height {}: {:?}", height, frontier);
+        let start_position = frontier.position() + 1;
+        tree.insert_frontier_nodes(
+            frontier,
+            Retention::Checkpoint {
+                id: height.into(),
+                is_marked: false,
+            },
+        )
+        .unwrap();
+        (tree, start_position)
+    } else {
+        panic!("No frontier found for height {}", height);
+    }
+}
+
+async fn bootstrap_sapling_tree_from_lightwalletd(
+    client: &mut WasmGrpcClient,
+    height: u32,
+) -> (SaplingCommitmentTree, Position) {
+    let mut tree = SaplingCommitmentTree::new(SaplingMemoryShardStore::empty(), MAX_CHECKPOINTS);
+
+    // fetch frontier at the end of the previous block
+    let init_frontier = fetch_sapling_frontier_at_height(client, height)
+        .await
+        .unwrap();
+
+    if let Some(frontier) = init_frontier.take() {
+        console_log!("Frontier was found for height {}: {:?}", height, frontier);
+        let start_position = frontier.position() + 1;
+        tree.insert_frontier_nodes(
+            frontier,
+            Retention::Checkpoint {
+                id: height.into(),
+                is_marked: false,
+            },
+        )
+        .unwrap();
+        (tree, start_position)
+    } else {
+        panic!("No frontier found for height {}", height);
+    }
+}
+
 async fn fetch_orchard_frontier_at_height(
     client: &mut WasmGrpcClient,
     height: u32,
@@ -154,9 +179,24 @@ async fn fetch_orchard_frontier_at_height(
         hash: vec![],
     };
     let pb_tree_state = client.get_tree_state(start).await?.into_inner();
-    let orchard_tree_frontier_bytes = hex::decode(pb_tree_state.orchard_tree)?;
+    let tree_frontier_bytes = hex::decode(pb_tree_state.orchard_tree)?;
 
-    let frontier: OrchardFrontier = read_frontier_v0(Cursor::new(orchard_tree_frontier_bytes))?;
+    let frontier: OrchardFrontier = read_frontier_v0(Cursor::new(tree_frontier_bytes))?;
+    Ok(frontier)
+}
+
+async fn fetch_sapling_frontier_at_height(
+    client: &mut WasmGrpcClient,
+    height: u32,
+) -> anyhow::Result<SaplingFrontier> {
+    let start = proto::service::BlockId {
+        height: height as u64,
+        hash: vec![],
+    };
+    let pb_tree_state = client.get_tree_state(start).await?.into_inner();
+    let tree_frontier_bytes = hex::decode(pb_tree_state.sapling_tree)?;
+
+    let frontier: SaplingFrontier = read_frontier_v0(Cursor::new(tree_frontier_bytes))?;
     Ok(frontier)
 }
 
@@ -165,8 +205,7 @@ fn batch_insert_from_orchard_actions(
     tree: &mut OrchardCommitmentTree,
     start_position: Position,
     actions: Vec<(OrchardDomain, CompactAction)>,
-)
-{
+) {
     let commitments = actions
         .iter()
         .map(|action| MerkleHashOrchard::from_cmx(&action.1.cmx()))
@@ -180,8 +219,7 @@ fn batch_insert_from_sapling_outputs(
     tree: &mut SaplingCommitmentTree,
     start_position: Position,
     outputs: Vec<(SaplingDomain, CompactOutputDescription)>,
-)
-{
+) {
     let commitments = outputs
         .iter()
         .map(|action| sapling::Node::from_cmu(&action.1.cmu))
@@ -197,10 +235,9 @@ fn parallel_batch_add_commitments<S, H, const DEPTH: u8, const SHARD_HEIGHT: u8>
     tree: &mut ShardTree<S, DEPTH, SHARD_HEIGHT>,
     start_position: Position,
     commitments: &[S::H],
-) 
-    where
-        S: ShardStore<CheckpointId = BlockHeight, H = H>,
-        H: Hashable + Send + Sync + Clone + PartialEq + Copy
+) where
+    S: ShardStore<CheckpointId = BlockHeight, H = H>,
+    H: Hashable + Send + Sync + Clone + PartialEq + Copy,
 {
     // Create subtrees from the note commitments in parallel.
     const CHUNK_SIZE: usize = 1024;

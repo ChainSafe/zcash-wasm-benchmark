@@ -113,10 +113,7 @@ pub fn block_contents_batch_stream(
                         (actions, outputs)
                     },
                 );
-                console_log!(
-                    "Time to convert blocks to actions and outputs: {}ms",
-                    PERFORMANCE.now() - start
-                );
+
                 blocks_processed += blocks_len;
                 actions_processed += actions.len();
                 outputs_processed += outputs.len();
