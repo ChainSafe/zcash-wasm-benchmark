@@ -21,7 +21,7 @@ pub fn generate_proof_bench(params: BenchParams, n_spends: u32) {
     }
 
     let rng = OsRng;
-    console::log_1(&"Starting Proof".into());
+    console::log_1(&"Starting key generation".into());
 
     console::time_with_label("Spending Key from Bytes");
     let sk = SpendingKey::from_bytes([7; 32]).unwrap();
@@ -53,10 +53,12 @@ pub fn generate_proof_bench(params: BenchParams, n_spends: u32) {
     };
 
     let (bundle, instances) = create_bundle(n_spends);
+    console::log_1(&"Starting proving".into());
     console::time_with_label(&format!("Proving with {} spends", n_spends));
     bundle
         .authorization()
         .create_proof(&pk, &instances, rng)
         .unwrap();
     console::time_end_with_label(&format!("Proving with {} spends", n_spends));
+    console::log_1(&"Test complete".into());
 }

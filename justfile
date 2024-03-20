@@ -6,18 +6,13 @@ default:
 alias b := build-rust
 
 # Build both parallel and non parallel WASM binaries
-build-rust profile=default_profile: (_check-profile profile) && (build-parallel profile) (build-no-parallel profile)
+build-rust profile=default_profile: (_check-profile profile) && (build-parallel profile)
     @echo Building both Parallel and non Parallel features in {{ profile }} mode
 
 # Build WASM binary with Parallel feature
 build-parallel profile=default_profile: (_check-profile profile)
     @echo Building with Parallel feature in {{ profile }} mode
     wasm-pack build -t web  --{{ profile }} --out-dir demo-page/wasm-pkg/parallel --features=parallel
-
-# Build WASM binary without Parallel feature
-build-no-parallel profile=default_profile: (_check-profile profile)
-    @echo Building without Parallel feature in {{ profile }} mode
-    wasm-pack build -t web  --{{ profile }} --out-dir demo-page/wasm-pkg/serial
 
 _check-profile profile:
     @echo {{ if profile =~ "release|debug|profiling" { "" } else { error("Profile must be one of: release|debug|profiling") } }} > /dev/null 2>&1

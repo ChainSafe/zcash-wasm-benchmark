@@ -23,9 +23,10 @@ export function App() {
 
     // State
     let [startBlock, setStartBlock] = useState(ORCHARD_ACTIVATION + 15000);
-    let [endBlock, setEndBlock] = useState(startBlock + 2000);
+    let [endBlock, setEndBlock] = useState(startBlock + 10000);
+    let [batchSize, setBatchSize] = useState(250);
     let [network, setNetwork] = useState("mainnet");
-    let [shieldedPool, setShieldedPool] = useState("orchard");
+    let [shieldedPool, setShieldedPool] = useState("both");
     let [lightwalletdProxy, setLightwalletdProxy] = useState(MAINNET_LIGHTWALLETD_PROXY);
     let [paymentFrequency, setPaymentFrequency] = useState(0);
     let [proofGenerationSpends, setProofGenerationSpends] = useState(1);
@@ -42,13 +43,6 @@ export function App() {
 
     function onPoolUpdate(pool) {
         setShieldedPool(pool);
-        if (pool === "sapling") {
-            setStartBlock(SAPLING_ACTIVATION);
-            setEndBlock(SAPLING_ACTIVATION + 1000);
-        } else {
-            setStartBlock(ORCHARD_ACTIVATION);
-            setEndBlock(ORCHARD_ACTIVATION + 1000);
-        }
     }
 
     function current_params() {
@@ -58,6 +52,7 @@ export function App() {
             lightwalletdProxy,
             startBlock,
             endBlock,
+            batchSize,
         );
     }
 
@@ -70,7 +65,7 @@ export function App() {
     }
 
     async function runProofGeneration() {
-        generate_orchard_proof(current_params(), proofGenerationSpends)
+        generate_proof_bench(current_params(), proofGenerationSpends)
     }
 
     return (
@@ -108,6 +103,12 @@ export function App() {
                     End Block:
                     <input type="number" value={endBlock} onChange={(e) => setEndBlock(e.target.value)} />
                 </label>
+                <span >{`${endBlock - startBlock} blocks. Approximately ${Math.round((endBlock - startBlock) * 1.2 / 60 / 24) } days on Zcash mainnet`}</span>
+                <br/>
+                <label>
+                    Block batch size:
+                    <input type="number" value={batchSize} onChange={(e) => setBatchSize(e.target.value)} />
+                </label>
             </div>
 
             <hr />
@@ -137,7 +138,7 @@ export function App() {
 
             <div>
                 <h2>Proof Generation</h2>
-                <p>Generate a proof for a dummy transaction with the given number of spends</p>
+                <p>Generate a proof for a dummy transaction with the given number of spends. Note the shielded pool must be set to Orchard for this test.</p>
                 <label>
                     Number of spends:
                     <input type="number" value={proofGenerationSpends} onChange={e => setProofGenerationSpends(Number(e.target.value))} />

@@ -11,6 +11,7 @@ pub struct BenchParams {
     pub lightwalletd_url: String,
     pub start_block: u32,
     pub end_block: u32,
+    pub block_batch_size: u32
 }
 
 #[wasm_bindgen]
@@ -22,6 +23,7 @@ impl BenchParams {
         lightwalletd_url: String,
         start_block: u32,
         end_block: u32,
+        block_batch_size: u32
     ) -> BenchParams {
         BenchParams {
             network: Network::from_str(&network).unwrap(),
@@ -29,6 +31,7 @@ impl BenchParams {
             lightwalletd_url,
             start_block,
             end_block,
+            block_batch_size,
         }
     }
 }
@@ -46,6 +49,24 @@ pub enum ShieldedPool {
     Sapling,
     Orchard,
     Both,
+}
+
+impl ShieldedPool {
+    pub fn sync_sapling(&self) -> bool {
+        match self {
+            ShieldedPool::Sapling => true,
+            ShieldedPool::Orchard => false,
+            ShieldedPool::Both => true,
+        }
+    }
+
+    pub fn sync_orchard(&self) -> bool {
+        match self {
+            ShieldedPool::Sapling => false,
+            ShieldedPool::Orchard => true,
+            ShieldedPool::Both => true,
+        }
+    }
 }
 
 impl FromStr for Network {
