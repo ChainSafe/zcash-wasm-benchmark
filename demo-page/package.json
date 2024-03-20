@@ -1,6 +1,5 @@
 {
   "name": "demo-page",
-  "packageManager": "yarn@4.0.2",
   "scripts": {
     "dev": "parcel src/index.html",
     "build": "parcel build src/index.html"
