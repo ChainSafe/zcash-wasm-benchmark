@@ -72,7 +72,7 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
         .await
         .unwrap();
 
-    let s = block_contents_batch_stream(client, pool, start_block, end_block, block_batch_size);
+    let s = block_contents_batch_stream(client, pool, start_block, end_block, block_batch_size, 0);
     pin_mut!(s);
 
     while let Some((actions, outputs)) = s.next().await {

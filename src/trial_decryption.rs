@@ -18,7 +18,7 @@ use crate::WasmGrpcClient;
 
 /// This is the top level function that will be called from the JS side
 #[wasm_bindgen]
-pub async fn trial_decryption_bench(params: BenchParams, _view_key: Option<Vec<u8>>) {
+pub async fn trial_decryption_bench(params: BenchParams, spam_filter_limit: u32, _view_key: Option<Vec<u8>>) {
     console::log_1(&format!("Starting Trial Decryption with params: {:?}", params).into());
 
     let BenchParams {
@@ -31,7 +31,7 @@ pub async fn trial_decryption_bench(params: BenchParams, _view_key: Option<Vec<u
     } = params;
     let client = WasmGrpcClient::new(Client::new(lightwalletd_url.clone()));
 
-    trial_decrypt_range(client, pool, start_block, end_block, block_batch_size).await;
+    trial_decrypt_range(client, pool, start_block, end_block, block_batch_size, spam_filter_limit).await;
 }
 
 pub async fn trial_decrypt_range(
@@ -40,11 +40,12 @@ pub async fn trial_decrypt_range(
     start_height: u32,
     end_height: u32,
     batch_size: u32,
+    spam_filter_limit: u32,
 ) {
     let ivks_orchard = crate::trial_decryption::dummy_ivk_orchard(1);
     let ivks_sapling = crate::trial_decryption::dummy_ivk_sapling(1);
 
-    let s = block_contents_batch_stream(client, pool, start_height, end_height, batch_size);
+    let s = block_contents_batch_stream(client, pool, start_height, end_height, batch_size, spam_filter_limit);
     pin_mut!(s);
     while let Some((actions, outputs)) = s.next().await {
         let ivks_orchard = ivks_orchard.clone();

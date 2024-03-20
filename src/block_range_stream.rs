@@ -1,12 +1,12 @@
-use std::convert::TryInto;
 use futures_util::{Stream, TryStreamExt};
+use std::convert::TryInto;
 use tonic::Streaming;
 
-use sapling::note_encryption::{CompactOutputDescription, SaplingDomain, Zip212Enforcement};
 use orchard::note_encryption::{CompactAction, OrchardDomain};
+use sapling::note_encryption::{CompactOutputDescription, SaplingDomain, Zip212Enforcement};
 
-use crate::console_log;
 use crate::bench_params::ShieldedPool;
+use crate::console_log;
 use crate::proto::compact_formats::CompactBlock;
 use crate::proto::service::{BlockId, BlockRange};
 use crate::{WasmGrpcClient, PERFORMANCE};
@@ -41,6 +41,7 @@ pub fn block_contents_batch_stream(
     start_height: u32,
     end_height: u32,
     batch_size: u32,
+    spam_filter_limit: u32,
 ) -> impl Stream<
     Item = (
         Vec<(OrchardDomain, CompactAction)>,
@@ -71,7 +72,14 @@ pub fn block_contents_batch_stream(
                     (vec![], vec![]),
                     |(mut actions, mut outputs), tx| {
                         let mut act = if pool.sync_orchard() {
-                            tx.actions
+                            if tx.actions.len() > spam_filter_limit as usize {
+                                console_log!(
+                                    "Skipped a transaction with {} actions",
+                                    tx.actions.len()
+                                );
+                                vec![]
+                            } else {
+                                tx.actions
                                 .into_iter()
                                 .map(|action| {
                                     let action: CompactAction = action.try_into().unwrap();
@@ -79,10 +87,19 @@ pub fn block_contents_batch_stream(
                                     (domain, action)
                                 })
                                 .collect::<Vec<_>>()
+                            }
+
                         } else {
                             vec![]
                         };
                         let mut opt = if pool.sync_sapling() {
+                            if tx.outputs.len() > spam_filter_limit as usize {
+                                console_log!(
+                                    "Skipped a transaction with {} actions",
+                                    tx.outputs.len()
+                                );
+                                vec![]
+                            } else {
                             tx.outputs
                                 .into_iter()
                                 .map(|output| {
@@ -90,6 +107,7 @@ pub fn block_contents_batch_stream(
                                     (SaplingDomain::new(Zip212Enforcement::On), output)
                                 })
                                 .collect::<Vec<_>>()
+                            }
                         } else {
                             vec![]
                         };
