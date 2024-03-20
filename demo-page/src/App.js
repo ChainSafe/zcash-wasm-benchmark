@@ -24,10 +24,11 @@ export function App() {
     // State
     let [startBlock, setStartBlock] = useState(ORCHARD_ACTIVATION + 15000);
     let [endBlock, setEndBlock] = useState(startBlock + 10000);
-    let [batchSize, setBatchSize] = useState(250);
+    let [batchSize, setBatchSize] = useState(1000);
     let [network, setNetwork] = useState("mainnet");
     let [shieldedPool, setShieldedPool] = useState("both");
     let [lightwalletdProxy, setLightwalletdProxy] = useState(MAINNET_LIGHTWALLETD_PROXY);
+    let [spamFilterLimit, setSpamFilterLimit] = useState(50);
     let [paymentFrequency, setPaymentFrequency] = useState(0);
     let [proofGenerationSpends, setProofGenerationSpends] = useState(1);
 
@@ -57,7 +58,7 @@ export function App() {
     }
 
     async function runTrialDecryption() {
-        await trial_decryption_bench(current_params());
+        await trial_decryption_bench(current_params(), spamFilterLimit);
     }
 
     async function runTreeStateSync() {
@@ -118,6 +119,10 @@ export function App() {
                 <p>
                     Download all blocks in the provided range and trial decrypt all transactions
                 </p>
+                <label>
+                    Skip txns with outputs greater than:
+                    <input type="number" value={spamFilterLimit} onChange={(e) => setSpamFilterLimit(e.target.value)} />
+                </label>
                 <button onClick={runTrialDecryption}>Start</button>
             </div>
 
