@@ -80,9 +80,8 @@ export function App() {
             Open the browser console to see results of benchmarks
 
             <h2>Multi-thread Setup</h2>
-                <p>
-                    THIS MUST BE SET EXACTLY ONCE BEFORE ANY TESTS CAN BE RUN. It will initialize a pool of web workers. If you want to change this you need to refresh the page.
-                </p>
+                <p>THIS MUST BE SET EXACTLY ONCE BEFORE ANY TESTS CAN BE RUN.</p>
+                <p>It will initialize a pool of web workers. If you want to change this you need to refresh the page.</p>
                 <label>
                     Number of threads:
                     <input type="number" value={nThreads} onChange={(e) => setNThreads(e.target.value)} />
@@ -146,11 +145,7 @@ export function App() {
             <div>
                 <h2>Treestate Sync</h2>
                 <p>Retrieve the commitment tree frontier as of start_block and insert all note commitments to advance the tree up to end_block.</p>
-                <p>To simulate a wallet that actually has spendable notes the first "Witnesses to update" commitments are registered to be updated with every batch.</p>
-                <label>
-                    Witnesses to update:
-                    <input type="number" value={witnesses} onChange={(e) => setWitnesses(Number(e.target.value))} />
-                </label>
+                <p>To simulate a wallet that actually has spendable notes the first note from every batch is added to the list to maintain witnesses for.</p>
                 <button onClick={runTreeStateSync}>Start</button>
             </div>
 
