@@ -4,6 +4,7 @@ import initWasm, { trial_decryption_bench, generate_proof_bench, sync_commitment
 
 const SAPLING_ACTIVATION = 419200;
 const ORCHARD_ACTIVATION = 1687104;
+const TIP = 2442739;
 
 const MAINNET_LIGHTWALLETD_PROXY = "http://localhost:443";
 const TESTNET_LIGHTWALLETD_PROXY = "http://testnet.localhost:443";
@@ -14,22 +15,20 @@ export function App() {
     useEffect(() => {
         async function init() {
             await initWasm();
-            let threads = navigator.hardwareConcurrency || 1;
-            console.log("Initializing thread pool with", threads, "threads");
-            await initThreadPool(threads);
         }
         init();
     }, []);
 
     // State
-    let [startBlock, setStartBlock] = useState(ORCHARD_ACTIVATION + 15000);
-    let [endBlock, setEndBlock] = useState(startBlock + 10000);
+    let [nThreads, setNThreads] = useState(navigator.hardwareConcurrency || 1);
+    let [startBlock, setStartBlock] = useState(TIP - 36000);
+    let [endBlock, setEndBlock] = useState(TIP);
     let [batchSize, setBatchSize] = useState(1000);
     let [network, setNetwork] = useState("mainnet");
     let [shieldedPool, setShieldedPool] = useState("both");
     let [lightwalletdProxy, setLightwalletdProxy] = useState(MAINNET_LIGHTWALLETD_PROXY);
     let [spamFilterLimit, setSpamFilterLimit] = useState(50);
-    let [paymentFrequency, setPaymentFrequency] = useState(0);
+    let [witnesses, setWitnesses] = useState(10);
     let [proofGenerationSpends, setProofGenerationSpends] = useState(1);
 
     // Event Handlers
@@ -69,11 +68,26 @@ export function App() {
         generate_proof_bench(current_params(), proofGenerationSpends)
     }
 
+    async function setupWorkers() {
+        console.log("Initializing thread pool with", nThreads, "threads");
+        await initThreadPool(nThreads);
+    }
+
     return (
         <div>
             <h1>ZCash Web - Browser Benchmarks</h1>
 
             Open the browser console to see results of benchmarks
+
+            <h2>Multi-thread Setup</h2>
+                <p>THIS MUST BE SET EXACTLY ONCE BEFORE ANY TESTS CAN BE RUN.</p>
+                <p>It will initialize a pool of web workers. If you want to change this you need to refresh the page.</p>
+                <label>
+                    Number of threads:
+                    <input type="number" value={nThreads} onChange={(e) => setNThreads(e.target.value)} />
+                </label>
+                <button onClick={setupWorkers}>Init Threadpool</button>
+            <hr />
 
             <h2>Global Settings</h2>
             <div>
@@ -131,11 +145,7 @@ export function App() {
             <div>
                 <h2>Treestate Sync</h2>
                 <p>Retrieve the commitment tree frontier as of start_block and insert all note commitments to advance the tree up to end_block.</p>
-                <p>To simulate a wallet that is receiving outputs and tracking witnesses this test optionally mark random outputs every X blocks to update a witness for.</p>
-                <label>
-                    Payment Frequency:
-                    <input type="number" value={paymentFrequency} onChange={(e) => setPaymentFrequency(Number(e.target.value))} />
-                </label>
+                <p>To simulate a wallet that actually has spendable notes the first note from every batch is added to the list to maintain witnesses for.</p>
                 <button onClick={runTreeStateSync}>Start</button>
             </div>
 

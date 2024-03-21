@@ -48,7 +48,7 @@ pub type SaplingFrontier = Frontier<sapling::Node, { sapling::NOTE_COMMITMENT_TR
 /// included in blocks between start and end.
 /// Finally checks to ensure the computed tree frontier matches the expected frontier at the end block height
 #[wasm_bindgen]
-pub async fn sync_commitment_tree_bench(params: BenchParams) {
+pub async fn sync_commitment_tree_bench(params: BenchParams, n_witnesses: u32) {
     let BenchParams {
         network: _,
         pool,
@@ -61,7 +61,7 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
     let mut client = WasmGrpcClient::new(Client::new(lightwalletd_url.clone()));
     let (mut orchard_tree, mut orchard_cursor) =
         bootstrap_orchard_tree_from_lightwalletd(&mut client, start_block - 1).await;
-    let start_position = orchard_cursor;
+    let orchard_start_position = orchard_cursor;
 
     let (mut sapling_tree, mut sapling_cursor) =
         bootstrap_sapling_tree_from_lightwalletd(&mut client, start_block - 1).await;
@@ -72,23 +72,25 @@ pub async fn sync_commitment_tree_bench(params: BenchParams) {
         .await
         .unwrap();
 
-    let s = block_contents_batch_stream(client, pool, start_block, end_block, block_batch_size, 0);
+    let s = block_contents_batch_stream(client, pool, start_block, end_block, block_batch_size, u32::MAX);
     pin_mut!(s);
 
     while let Some((actions, outputs)) = s.next().await {
-        let (added_orchard, added_sapling) = (actions.len() as u64, outputs.len() as u64);
+        let (added_orchard, added_sapling) = (actions.len(), outputs.len());
 
-        batch_insert_from_orchard_actions(&mut orchard_tree, orchard_cursor, actions);
-        batch_insert_from_sapling_outputs(&mut sapling_tree, sapling_cursor, outputs);
+        // Not the most readable code but what this is saying is to mark the first action/output of each batch as a node to maintain a witness for
+        // This simulates a wallet that slowly builds up a witness set over time
+        batch_insert_from_orchard_actions(&mut orchard_tree, orchard_cursor, actions.into_iter().enumerate().map(|(i, (domain, action))| (domain, action, if i == 0 { Retention::Marked } else { Retention::Ephemeral })));
+        batch_insert_from_sapling_outputs(&mut sapling_tree, sapling_cursor, outputs.into_iter().enumerate().map(|(i, (domain, output))| (domain, output, if i == 0 { Retention::Marked } else { Retention::Ephemeral })));
 
-        orchard_cursor += added_orchard;
-        sapling_cursor += added_sapling;
+        orchard_cursor += added_orchard as u64;
+        sapling_cursor += added_sapling as u64;
     }
 
-    // produce a witness for the first added leaf
+    // produce a witness for the first added leaf in the orchard tree
     let calc_witness = PERFORMANCE.now();
     let _witness = orchard_tree
-        .witness_at_checkpoint_depth(start_position, 0)
+        .witness_at_checkpoint_depth(orchard_start_position, 0)
         .unwrap();
     console_log!(
         "Produce witness for leftmost leaf: {}ms",
@@ -195,11 +197,10 @@ async fn fetch_sapling_frontier_at_height(
 fn batch_insert_from_orchard_actions(
     tree: &mut OrchardCommitmentTree,
     start_position: Position,
-    actions: Vec<(OrchardDomain, CompactAction)>,
+    actions: impl Iterator<Item = (OrchardDomain, CompactAction, Retention<BlockHeight>)>,
 ) {
     let commitments = actions
-        .iter()
-        .map(|action| MerkleHashOrchard::from_cmx(&action.1.cmx()))
+        .map(|(_, action, retention)| (MerkleHashOrchard::from_cmx(&action.cmx()), retention))
         .collect::<Vec<_>>();
 
     parallel_batch_add_commitments(tree, start_position, &commitments);
@@ -209,11 +210,11 @@ fn batch_insert_from_orchard_actions(
 fn batch_insert_from_sapling_outputs(
     tree: &mut SaplingCommitmentTree,
     start_position: Position,
-    outputs: Vec<(SaplingDomain, CompactOutputDescription)>,
+    outputs: impl Iterator<Item = (SaplingDomain, CompactOutputDescription, Retention<BlockHeight>)>,
 ) {
     let commitments = outputs
-        .iter()
-        .map(|action| sapling::Node::from_cmu(&action.1.cmu))
+        .map(|(_, output, retention)| (sapling::Node::from_cmu(&output.cmu), retention))
+
         .collect::<Vec<_>>();
 
     parallel_batch_add_commitments(tree, start_position, &commitments);
@@ -225,7 +226,7 @@ fn batch_insert_from_sapling_outputs(
 fn parallel_batch_add_commitments<S, H, const DEPTH: u8, const SHARD_HEIGHT: u8>(
     tree: &mut ShardTree<S, DEPTH, SHARD_HEIGHT>,
     start_position: Position,
-    commitments: &[S::H],
+    commitments: &[(S::H, Retention<BlockHeight>)],
 ) where
     S: ShardStore<CheckpointId = BlockHeight, H = H>,
     H: Hashable + Send + Sync + Clone + PartialEq + Copy,
@@ -243,14 +244,10 @@ fn parallel_batch_add_commitments<S, H, const DEPTH: u8, const SHARD_HEIGHT: u8>
             shardtree::LocatedTree::from_iter(
                 start..end,
                 ORCHARD_SHARD_HEIGHT.into(),
-                chunk.iter().enumerate().map(|(i, cmx)| {
+                chunk.iter().map(|(cmx, retention)| {
                     (
                         *cmx,
-                        if i == 0 {
-                            Retention::Marked
-                        } else {
-                            Retention::Ephemeral
-                        },
+                        *retention
                     )
                 }),
                 // note that all leaves marked ephemeral  (all but the first added) will be pruned out
