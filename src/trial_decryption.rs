@@ -18,7 +18,7 @@ use crate::WasmGrpcClient;
 
 /// This is the top level function that will be called from the JS side
 #[wasm_bindgen]
-pub async fn trial_decryption_bench(params: BenchParams, spam_filter_limit: u32, _view_key: Option<Vec<u8>>) {
+pub async fn trial_decryption_bench(params: BenchParams, spam_filter_limit: u32, _view_key: Option<Vec<u8>>) -> f64 {
     console::log_1(&format!("Starting Trial Decryption with params: {:?}", params).into());
 
     let BenchParams {
@@ -31,7 +31,8 @@ pub async fn trial_decryption_bench(params: BenchParams, spam_filter_limit: u32,
     } = params;
     let client = WasmGrpcClient::new(Client::new(lightwalletd_url.clone()));
 
-    trial_decrypt_range(client, pool, start_block, end_block, block_batch_size, spam_filter_limit).await;
+    let (total_actions, total_outputs) = trial_decrypt_range(client, pool, start_block, end_block, block_batch_size, spam_filter_limit).await;
+    (total_actions + total_outputs) as f64
 }
 
 pub async fn trial_decrypt_range(
@@ -41,13 +42,17 @@ pub async fn trial_decrypt_range(
     end_height: u32,
     batch_size: u32,
     spam_filter_limit: u32,
-) {
+) -> (u32, u32) {
     let ivks_orchard = crate::trial_decryption::dummy_ivk_orchard(1);
     let ivks_sapling = crate::trial_decryption::dummy_ivk_sapling(1);
 
     let s = block_contents_batch_stream(client, pool, start_height, end_height, batch_size, spam_filter_limit);
     pin_mut!(s);
+    let (mut total_actions, mut total_outputs) = (0, 0);
     while let Some((actions, outputs)) = s.next().await {
+        total_actions += actions.len() as u32;
+        total_outputs += outputs.len() as u32;
+
         let ivks_orchard = ivks_orchard.clone();
         let ivks_sapling = ivks_sapling.clone();
         let (tx, rx) = futures_channel::oneshot::channel();
@@ -66,6 +71,7 @@ pub async fn trial_decrypt_range(
     }
 
     console_log!("Decryption complete");
+    (total_actions, total_outputs)
 }
 
 pub(crate) fn batch_decrypt_compact<D: BatchDomain, Output: ShieldedOutput<D, COMPACT_NOTE_SIZE>>(

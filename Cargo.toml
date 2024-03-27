@@ -82,6 +82,9 @@ which = "4"
 wasm-bindgen-test = "0.3.34"
 wasm-bindgen-rayon = { version = "1.2" }
 web-sys = { version = "0.3.68", features = ["console", "Window", "Navigator"] }
+itertools = "0.12.1"
+polars = { version = "0.38.3", default-features = false, features = ["json", "fmt_no_tty"] }
+serde_json = "1.0.114"
 
 [features]
 default = ["console_error_panic_hook"]

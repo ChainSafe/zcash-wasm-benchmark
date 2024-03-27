@@ -127,8 +127,8 @@ pub fn block_contents_batch_stream(
                 console_log!(
                     "
 Processed {} blocks in range: [{}, {}] in {}ms
-- Total Orchard Actions Processed: {}
-- Total Sapling Outputs Processed: {}
+- Orchard Actions Processed: {}
+- Sapling Outputs Processed: {}
 - Total Blocks Processed: {}
 - Blocks remaining to sync: {} ({}%)
 - Total Time Elapsed: {}ms",

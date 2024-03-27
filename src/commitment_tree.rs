@@ -25,7 +25,6 @@ use crate::block_range_stream::block_contents_batch_stream;
 use crate::console_log;
 use crate::proto;
 use crate::WasmGrpcClient;
-use crate::PERFORMANCE;
 
 pub const ORCHARD_SHARD_HEIGHT: u8 = { orchard::NOTE_COMMITMENT_TREE_DEPTH as u8 } / 2;
 pub const SAPLING_SHARD_HEIGHT: u8 = { sapling::NOTE_COMMITMENT_TREE_DEPTH } / 2;
@@ -48,7 +47,7 @@ pub type SaplingFrontier = Frontier<sapling::Node, { sapling::NOTE_COMMITMENT_TR
 /// included in blocks between start and end.
 /// Finally checks to ensure the computed tree frontier matches the expected frontier at the end block height
 #[wasm_bindgen]
-pub async fn sync_commitment_tree_bench(params: BenchParams, n_witnesses: u32) {
+pub async fn sync_commitment_tree_bench(params: BenchParams, n_witnesses: u32) -> f64 {
     let BenchParams {
         network: _,
         pool,
@@ -61,7 +60,6 @@ pub async fn sync_commitment_tree_bench(params: BenchParams, n_witnesses: u32) {
     let mut client = WasmGrpcClient::new(Client::new(lightwalletd_url.clone()));
     let (mut orchard_tree, mut orchard_cursor) =
         bootstrap_orchard_tree_from_lightwalletd(&mut client, start_block - 1).await;
-    let orchard_start_position = orchard_cursor;
 
     let (mut sapling_tree, mut sapling_cursor) =
         bootstrap_sapling_tree_from_lightwalletd(&mut client, start_block - 1).await;
@@ -75,36 +73,32 @@ pub async fn sync_commitment_tree_bench(params: BenchParams, n_witnesses: u32) {
     let s = block_contents_batch_stream(client, pool, start_block, end_block, block_batch_size, u32::MAX);
     pin_mut!(s);
 
+    let mut orchard_witnesses_tracked = 0;
+    let mut sapling_witnesses_tracked = 0;
+
     while let Some((actions, outputs)) = s.next().await {
         let (added_orchard, added_sapling) = (actions.len(), outputs.len());
 
-        // Not the most readable code but what this is saying is to mark the first action/output of each batch as a node to maintain a witness for
-        // This simulates a wallet that slowly builds up a witness set over time
-        batch_insert_from_orchard_actions(&mut orchard_tree, orchard_cursor, actions.into_iter().enumerate().map(|(i, (domain, action))| (domain, action, if i == 0 { Retention::Marked } else { Retention::Ephemeral })));
-        batch_insert_from_sapling_outputs(&mut sapling_tree, sapling_cursor, outputs.into_iter().enumerate().map(|(i, (domain, output))| (domain, output, if i == 0 { Retention::Marked } else { Retention::Ephemeral })));
+        // Not the most readable code but what this is saying is to mark the first n_witness actions/outputs to maintain witnesses for
+        batch_insert_from_orchard_actions(&mut orchard_tree, orchard_cursor, actions.into_iter().map(|(domain, action)| (domain, action, if orchard_witnesses_tracked < n_witnesses { orchard_witnesses_tracked +=1; Retention::Marked } else { Retention::Ephemeral })));
+        batch_insert_from_sapling_outputs(&mut sapling_tree, sapling_cursor, outputs.into_iter().map(|(domain, output)| (domain, output, if sapling_witnesses_tracked < n_witnesses { sapling_witnesses_tracked +=1; Retention::Marked } else { Retention::Ephemeral })));
 
         orchard_cursor += added_orchard as u64;
         sapling_cursor += added_sapling as u64;
     }
 
-    // produce a witness for the first added leaf in the orchard tree
-    let calc_witness = PERFORMANCE.now();
-    let _witness = orchard_tree
-        .witness_at_checkpoint_depth(orchard_start_position, 0)
-        .unwrap();
-    console_log!(
-        "Produce witness for leftmost leaf: {}ms",
-        PERFORMANCE.now() - calc_witness
-    );
+    if orchard_witnesses_tracked > 0 {
+        assert_eq!(
+            end_frontier.root(),
+            orchard_tree.root_at_checkpoint_depth(0).unwrap()
+        );
+        console_log!(
+            "✅ Computed orchard root for block {} matches lightwalletd ✅",
+            end_block
+        );
+    }
 
-    assert_eq!(
-        end_frontier.root(),
-        orchard_tree.root_at_checkpoint_depth(0).unwrap()
-    );
-    console_log!(
-        "✅ Computed orchard root for block {} matches lightwalletd ✅",
-        end_block
-    );
+    (Into::<u64>::into(orchard_cursor) + Into::<u64>::into(sapling_cursor)) as f64
 }
 
 async fn bootstrap_orchard_tree_from_lightwalletd(

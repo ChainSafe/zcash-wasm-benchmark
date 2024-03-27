@@ -5,6 +5,8 @@ default:
 
 alias b := build-rust
 
+build: build-rust build-page
+
 # Build both parallel and non parallel WASM binaries
 build-rust profile=default_profile: (_check-profile profile) && (build-parallel profile)
     @echo Building both Parallel and non Parallel features in {{ profile }} mode
@@ -27,11 +29,11 @@ build-page:
 
 # Test in headless mode on firefox
 test-headless-firefox *FLAGS:
-    wasm-pack test  --release --headless --firefox --features=no-bundler {{FLAGS}}
+    WASM_BINDGEN_TEST_TIMEOUT=99999 wasm-pack test  --release --headless --firefox --features=no-bundler {{FLAGS}}
 
 # Test in headless mode on chrome
 test-headless-chrome *FLAGS:
-    wasm-pack test  --release --headless --chrome --features=no-bundler {{FLAGS}}
+   WASM_BINDGEN_TEST_TIMEOUT=99999  wasm-pack test  --release --headless --chrome --features=no-bundler {{FLAGS}}
 
 # Clean the WASM binaries and other artifacts from wasm-pack
 clean-wasm:

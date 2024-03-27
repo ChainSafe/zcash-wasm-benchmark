@@ -44,7 +44,7 @@ pub enum Network {
 }
 
 #[wasm_bindgen]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub enum ShieldedPool {
     Sapling,
     Orchard,
