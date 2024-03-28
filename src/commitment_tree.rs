@@ -70,7 +70,14 @@ pub async fn sync_commitment_tree_bench(params: BenchParams, n_witnesses: u32) -
         .await
         .unwrap();
 
-    let s = block_contents_batch_stream(client, pool, start_block, end_block, block_batch_size, u32::MAX);
+    let s = block_contents_batch_stream(
+        client,
+        pool,
+        start_block,
+        end_block,
+        block_batch_size,
+        u32::MAX,
+    );
     pin_mut!(s);
 
     let mut orchard_witnesses_tracked = 0;
@@ -80,8 +87,38 @@ pub async fn sync_commitment_tree_bench(params: BenchParams, n_witnesses: u32) -
         let (added_orchard, added_sapling) = (actions.len(), outputs.len());
 
         // Not the most readable code but what this is saying is to mark the first n_witness actions/outputs to maintain witnesses for
-        batch_insert_from_orchard_actions(&mut orchard_tree, orchard_cursor, actions.into_iter().map(|(domain, action)| (domain, action, if orchard_witnesses_tracked < n_witnesses { orchard_witnesses_tracked +=1; Retention::Marked } else { Retention::Ephemeral })));
-        batch_insert_from_sapling_outputs(&mut sapling_tree, sapling_cursor, outputs.into_iter().map(|(domain, output)| (domain, output, if sapling_witnesses_tracked < n_witnesses { sapling_witnesses_tracked +=1; Retention::Marked } else { Retention::Ephemeral })));
+        batch_insert_from_orchard_actions(
+            &mut orchard_tree,
+            orchard_cursor,
+            actions.into_iter().map(|(domain, action)| {
+                (
+                    domain,
+                    action,
+                    if orchard_witnesses_tracked < n_witnesses {
+                        orchard_witnesses_tracked += 1;
+                        Retention::Marked
+                    } else {
+                        Retention::Ephemeral
+                    },
+                )
+            }),
+        );
+        batch_insert_from_sapling_outputs(
+            &mut sapling_tree,
+            sapling_cursor,
+            outputs.into_iter().map(|(domain, output)| {
+                (
+                    domain,
+                    output,
+                    if sapling_witnesses_tracked < n_witnesses {
+                        sapling_witnesses_tracked += 1;
+                        Retention::Marked
+                    } else {
+                        Retention::Ephemeral
+                    },
+                )
+            }),
+        );
 
         orchard_cursor += added_orchard as u64;
         sapling_cursor += added_sapling as u64;
@@ -204,11 +241,16 @@ fn batch_insert_from_orchard_actions(
 fn batch_insert_from_sapling_outputs(
     tree: &mut SaplingCommitmentTree,
     start_position: Position,
-    outputs: impl Iterator<Item = (SaplingDomain, CompactOutputDescription, Retention<BlockHeight>)>,
+    outputs: impl Iterator<
+        Item = (
+            SaplingDomain,
+            CompactOutputDescription,
+            Retention<BlockHeight>,
+        ),
+    >,
 ) {
     let commitments = outputs
         .map(|(_, output, retention)| (sapling::Node::from_cmu(&output.cmu), retention))
-
         .collect::<Vec<_>>();
 
     parallel_batch_add_commitments(tree, start_position, &commitments);
@@ -238,12 +280,7 @@ fn parallel_batch_add_commitments<S, H, const DEPTH: u8, const SHARD_HEIGHT: u8>
             shardtree::LocatedTree::from_iter(
                 start..end,
                 ORCHARD_SHARD_HEIGHT.into(),
-                chunk.iter().map(|(cmx, retention)| {
-                    (
-                        *cmx,
-                        *retention
-                    )
-                }),
+                chunk.iter().map(|(cmx, retention)| (*cmx, *retention)),
                 // note that all leaves marked ephemeral  (all but the first added) will be pruned out
                 // once they have been used to updated any witnesses the tree is tracking
             )
