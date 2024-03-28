@@ -7,9 +7,9 @@ use sapling::note_encryption::{CompactOutputDescription, SaplingDomain, Zip212En
 
 use crate::bench_params::ShieldedPool;
 use crate::console_log;
-use crate::proto::compact_formats::CompactBlock;
-use crate::proto::service::{BlockId, BlockRange};
 use crate::{WasmGrpcClient, PERFORMANCE};
+use zcash_client_backend::proto::compact_formats::CompactBlock;
+use zcash_client_backend::proto::service::{BlockId, BlockRange};
 
 /// return a stream over a range of blocks.
 pub async fn block_range_stream(
@@ -82,7 +82,7 @@ pub fn block_contents_batch_stream(
                                 tx.actions
                                 .into_iter()
                                 .map(|action| {
-                                    let action: CompactAction = action.try_into().unwrap();
+                                    let action: CompactAction = (&action).try_into().unwrap();
                                     let domain = OrchardDomain::for_compact_action(&action);
                                     (domain, action)
                                 })

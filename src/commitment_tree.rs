@@ -23,7 +23,6 @@ use zcash_primitives::merkle_tree::read_frontier_v0;
 use crate::bench_params::BenchParams;
 use crate::block_range_stream::block_contents_batch_stream;
 use crate::console_log;
-use crate::proto;
 use crate::WasmGrpcClient;
 
 pub const ORCHARD_SHARD_HEIGHT: u8 = { orchard::NOTE_COMMITMENT_TREE_DEPTH as u8 } / 2;
@@ -198,7 +197,7 @@ async fn fetch_orchard_frontier_at_height(
     client: &mut WasmGrpcClient,
     height: u32,
 ) -> anyhow::Result<OrchardFrontier> {
-    let start = proto::service::BlockId {
+    let start = zcash_client_backend::proto::service::BlockId {
         height: height as u64,
         hash: vec![],
     };
@@ -213,7 +212,7 @@ async fn fetch_sapling_frontier_at_height(
     client: &mut WasmGrpcClient,
     height: u32,
 ) -> anyhow::Result<SaplingFrontier> {
-    let start = proto::service::BlockId {
+    let start = zcash_client_backend::proto::service::BlockId {
         height: height as u64,
         hash: vec![],
     };

@@ -3,10 +3,8 @@ use wasm_bindgen::prelude::*;
 mod commitment_tree;
 mod proof_gen;
 mod trial_decryption;
-mod types;
 
 use tonic_web_wasm_client::Client;
-mod proto;
 
 #[cfg(feature = "parallel")]
 pub use wasm_bindgen_rayon::init_thread_pool;
@@ -14,7 +12,7 @@ pub use wasm_bindgen_rayon::init_thread_pool;
 mod bench_params;
 mod block_range_stream;
 pub type WasmGrpcClient =
-    crate::proto::service::compact_tx_streamer_client::CompactTxStreamerClient<
+    zcash_client_backend::proto::service::compact_tx_streamer_client::CompactTxStreamerClient<
         tonic_web_wasm_client::Client,
     >;
 
@@ -51,9 +49,9 @@ pub fn set_panic_hook() {
 }
 
 pub fn new_compact_streamer_client(base_url: &str) -> WasmGrpcClient {
-    proto::service::compact_tx_streamer_client::CompactTxStreamerClient::new(Client::new(
-        base_url.to_string(),
-    ))
+    zcash_client_backend::proto::service::compact_tx_streamer_client::CompactTxStreamerClient::new(
+        Client::new(base_url.to_string()),
+    )
 }
 
 #[wasm_bindgen(start)]
