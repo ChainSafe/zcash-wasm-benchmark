@@ -1,16 +1,16 @@
-# ZCash Web Wallet - Feasibility Report
+# Zcash Web Wallet - Feasibility Report
 
 ## Executive Summary
 
-ChainSafe investigated the current feasibility of a browser based wallet for zcash. In this study we identified the essential computations that a wallet cannot hand-off to an untrusted party and developed benchmarking tests for these using Zcash mainnet block data. These tests can be run by anyone on their own system from the [benchmarking site](https://chainsafe.github.io/zcash-wasm-benchmark/) produced as part of this study.
+ChainSafe investigated the current feasibility of a browser based wallet for Zcash. In this study we identified the essential computations that a wallet cannot hand-off to an untrusted party and developed benchmarking tests for these using Zcash mainnet block data. These tests can be run by anyone on their own system from the [benchmarking site](https://chainsafe.github.io/zcash-wasm-benchmark/) produced as part of this study.
 
 It was found that trial decryption and note commitment witness updating could be done in reasonable time for recent block ranges but woud result in a poor user experience for blocks during the DoS attack period. Halo2 transaction proofs can be generated in reasonable time for typical numbers of spends.
 
 ## Wallet Requirements
 
-A fully features ZCash wallet must be able to perform the following operations:
+A fully featured Zcash wallet must be able to perform the following operations:
 
-1. Generation or import of keys
+1. Generating or importing of keys
 2. Maintaining a correct and spendable balance
 3. Ability to construct transactions and accompanying proofs
 
@@ -20,7 +20,7 @@ It is assumed that key generation is trivial so this study focused only on the t
 
 As described in [this article][1], to maintain a correct and spendable balance a wallet is required to:
 
-- Downloading compact blocks from a `lightwalletd` instance
+- Download compact blocks from a `lightwalletd` instance
 - Trial-decrypt all on-chain notes using the wallet view keys to detect new funds
 - Looking for nullifiers to detect spends of wallet notes
 - Maintaining a set of witnesses for spendable notes
@@ -35,21 +35,21 @@ Downloading blocks is made challenging by the fact that `lightwalletd` was devel
 
 Using this we were able to effectively request streams of blocks from `lightwalletd` in the browser.
 
-Our initial attemt was to use the grpc-web javascript library to retrieve the blocks and then pass these to the Wasm code for processing. Using this approach a significant amount of time was spent deserializing the responses and encoding them for Wasm. It was found to be significantly faster to make the grpc-web requests from the Rust code itself using the [tonic-web-wasm-client](https://docs.rs/tonic-web-wasm-client/latest/tonic_web_wasm_client/) crate. This also had the advantage of improving the codebase readability.
+Our initial attemt was to use the grpc-web javascript library to retrieve the blocks and then pass these to the Wasm code for processing. Using this approach a significant amount of time was spent deserializing the responses and encoding them for Wasm. It was found to be significantly faster to make the grpc-web requests from the Rust code itself using the [tonic-web-wasm-client](https://docs.rs/tonic-web-wasm-client/latest/tonic_web_wasm_client/) crate. This also had the advantage of improving the codebase readability by consolidating most of the business logic in Rust.
 
 To support future web wallets a public proxy should be deployed for the public mainnet `lightwalletd` services such as those currently provided by [Nighthawk](https://lightwalletd.com/links) 
 
-#### Trial Decryption
+#### Trial-Decryption
 
-For trial decryption we used the implementation from the librustzcash [zcash_note_encryption](https://crates.io/crates/zcash_note_encryption) crate. Specifically the `batch_note_decryption` function. This was used to decrypt Sapling outouts and Orchard actions retrieved from the blocks. It wraps the RustCrypto implementation of ChaCha20-Poly1305. 
+For trial-decryption we used the implementation from the librustzcash [zcash_note_encryption](https://crates.io/crates/zcash_note_encryption) crate. Specifically the `batch_note_decryption` function. This was used to decrypt Sapling outouts and Orchard actions retrieved from the blocks. It wraps the RustCrypto implementation of ChaCha20-Poly1305. 
 
-The trial decryption benchmark collects batches of blocks, extracts their outputs or actions (or both depending on pool configuration), decrypts them, and records how many notes successfully decrypted for the provided address. Transactions with more than 50 inputs/outputs/actions were ignored and presumed to be networks spam. 
+The trial decryption benchmark collects batches of blocks, extracts their outputs or actions (or both depending on pool configuration), decrypts them, and records how many notes successfully decrypted for the provided viewing key. Transactions with more than 50 inputs/outputs/actions were filtered and presumed to be network spam. This filter can be configured with some other heuristic. 
 
 ##### Parallel Implementation
 
 Support for multi-threading in Wasm using Web Workers has seen advancement in recent years. We tested this approach using the `rayon` data parallelism crate in Rust to divide batch into parts equal to the number of available threads and decrypt in parallel
 
-Using this approach we were able to acchieve an significant speed-up in trial decryption (see the results section below) on a consumer laptop. Since this is a highly parallelizable problem any developments in browser multi-threading will see a direct improvement on this benchmark.
+Using this approach we were able to achieve a significant speed-up in trial-decryption (see the results section below) on a consumer laptop. Since this is a highly parallelizable problem, any developments in browser multi-threading will see a direct improvement on this benchmark.
 
 #### Commitment Tree Hashing
 
@@ -69,7 +69,7 @@ This approach did not yield any significant improvements. At this point it is un
 
 #### Proof Generation
 
-To test proof generation in-browser we used the proving benchmark implementation from the [Orchard](https://github.com/zcash/orchard) crate. This was used without any changes and does not require retrieving network data. The existing Rust implementation supports parallel proving and this worked in Wasm out of the box.
+To test proof generation in-browser we used the proving benchmark implementation from the [Orchard](https://github.com/zcash/orchard) crate. This was used few changes (accounting for the criterion.rs benchmarking tool not being supported on `wasm32-unknown-unknown`) and does not require retrieving network data. The existing Rust implementation supports parallel proving and this worked in Wasm out of the box.
 
 ## Results
 
@@ -84,7 +84,7 @@ lto = true
 codegen-units = 1
 ```
 
-A further pass of optimization on the resulting Wasm was performed with `wasm-opt`  at the `-O4` level.
+A further pass of optimization on the resulting Wasm was performed with `wasm-opt` at the `-O4` level.
 
 The sync was done using mainnet blocks from the range [2334739, 2442739] which is the previous 108000 (90 days worth) of mainnet blocks at the time of writing. These blocks contain 41034 Sapling outputs and 29828 Orchard actions.
 
@@ -140,25 +140,25 @@ Note only Orchard Halo2 proving was evaluated
 
 ### Trial Decryption
 
-In the browser we were able to download an trial-decrypt 100k blocks (90 days of Zcash Mainnet) in around 15 seconds for both shielded pools. This corresponds to about 7700 blockes per second or around 5000 actions/outputs per second. Interestingly over this block range a number of the blocks must have been empty of shielded transactions as the number of outputs/actions is less than the total number of blocks.
+In the browser we were able to download and trial-decrypt 100000 blocks (90 days of Zcash Mainnet) in around 15 seconds for both shielded pools. This corresponds to about 7700 blockes per second or around 5000 actions/outputs per second. Interestingly, over this block range, a number of the blocks must have been empty of shielded transactions as the number of outputs/actions is less than the total number of blocks.
 
 Increasing the size of the batches of blocks kept in memory was effective in decreasing total decryption time however this is limited by the amount of memory available to the Wasm runtime (4GB).
 
-The successfully decrypted notes and the last syncced height could be cached in browser store and so under ideal circumstances this computation would only need to be repeated for the new blocks added since the user last opened the web wallet.
+The successfully decrypted notes and the last synced height could be cached in persistant browser stores (e.g. IndexedDB or OPFS) and so under ideal circumstances this computation would only need to be repeated for the new blocks added since the user last opened the web wallet.
 
 Trial decryption is the main wallet sync process that cannot be handed off to a third party without revealing the wallet view key and these results suggest that it can be done in a very reasonable amount of time, especially for newer wallets and those that are re-opened regularly.
 
-In the worst case (e.g. syncing from Orchard activation height) the total decryption time was very large taking around 55 minutes to complete. For this test the rate of decrypting actions/outputs dropped to around 2500 actions/outputs per second. It is assumed this decrease in performance is due to the additional network load required to download and deserialize blocks during the DoS attack period. Transaction with large number of inputs/outputs were filtered out but only after they had been downloaded and deserialized. It is expected that the average output processing rate could be significantly improved if these transactions were filtered out earlier by lightwalletd.
+In the worst case (e.g. syncing from Orchard activation height) the total decryption time was very large taking around 55 minutes to complete. For this test, the rate of decrypting actions/outputs dropped to around 2500 actions/outputs per second. It is assumed this decrease in performance is due to the additional network load required to download and deserialize blocks during the DoS attack period. Transactions with large numbers of inputs/outputs were filtered out but only after they had been downloaded and deserialized. It is expected that the average output processing rate could be significantly improved if these transactions were filtered out earlier by lightwalletd.
 
 ### Tree Sync
 
-The tree-sync results showed very significant performance improvement by increasing the block batch size. This is likely due to the high efficiency of the parallel sub-tree updating strategy over large block batches. For smaller batches this reduces to the single thread algorithm.
+The tree sync results showed very significant performance improvement by increasing the block batch size. This is likely due to the high efficiency of the parallel sub-tree updating strategy over large block batches. For smaller batches this reduces to the single-threaded algorithm.
 
 The number of witnesses being updated corresponds to the number of unspent transactions in the wallet. It was expected that the time to sync would increase significantly with the number of witnesses but the batch updating implementation in the ShardTree eliminates duplicate hashing of shared witness paths and leads to only a minimal decrease in performance.
 
 For this test the commitments for which witnesses were tracked were located in close proximity in the tree. A future improvement to this test might randomly scatter them in the tree which would better approximate the distribution of a wallets unspent outputs. This would likely see a more pronounced decrease in performance as the number of witnesses increases as they share fewer branches in the tree.
 
-Again this implementation shows very reasonable sync time with large batches in the multi-threaded implementation. If both the trial-decryption and tree-sync were performed on the same block data the time to download and deserialize blocks would be amortized between both and the time less than the sum of the measured time between tests.
+Again this implementation shows very reasonable sync times with large batches in the multi-threaded implementation. If both the trial-decryption and tree-sync were performed on the same block data the time to download and deserialize blocks would be amortized between both and the time less than the sum of the measured time between tests.
 
 Furthermore the tree sync does not need to be applied to from the wallet birthday to the chain tip. It only needs to be applied from the most recent uspent note. Strategies such as [BlazeSync](https://github.com/zecwalletco/zips/blob/blazesync/zip-1015.rst) and [DAGSync](https://words.str4d.xyz/dagsync-graph-aware-zcash-wallets/) could be applied to intelligently update the witnesses.
 
@@ -170,8 +170,8 @@ However given the block time in Zcash is 1 minute, 20 seconds of proving time be
 
 ## Conclusion
 
-From these results we conclude it would be possible to build a Zcash browser wallet with a good user experience under certain circumstances. Such a wallet would not be able to sync the entire chain in a reasonable time but for newly created wallets that are opened fairly frequently (every 90 days or so) the user experience could be satisfactory. As the main target audience for such a wallet is new users these conditions could be met.
+From these results we conclude it would be possible to build a Zcash browser wallet with a good user experience under certain circumstances. Such a wallet would not be able to sync the entire chain in a reasonable time, but for newly created wallets that are opened fairly frequently (every 90 days or so) the user experience could be satisfactory. 
 
 Syncing from Orchard activation takes a significantly long time that would be unacceptable to most users. It is expected this time could be reduced significantly by applying spam transaction filtering in lightwalletd.
 
-Further optimizations to sync time could be made by pipelining the trial decryption and tree-sync, intelligent tree sync strategies, and lower level optimizations of the expensive cryptographic operations for Wasm or even [WebGPU](https://geometry.dev/notebook/accelerating-client-side-zk-with-webgpu).
+Further optimizations to sync time could be made by pipelining the trial decryption and tree-sync, intelligent tree sync strategies, and lower level optimizations of the expensive cryptographic operations for Wasm via SIMD or even [WebGPU](https://geometry.dev/notebook/accelerating-client-side-zk-with-webgpu).
