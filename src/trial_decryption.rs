@@ -18,7 +18,11 @@ use crate::WasmGrpcClient;
 
 /// This is the top level function that will be called from the JS side
 #[wasm_bindgen]
-pub async fn trial_decryption_bench(params: BenchParams, spam_filter_limit: u32, _view_key: Option<Vec<u8>>) -> f64 {
+pub async fn trial_decryption_bench(
+    params: BenchParams,
+    spam_filter_limit: u32,
+    _view_key: Option<Vec<u8>>,
+) -> f64 {
     console::log_1(&format!("Starting Trial Decryption with params: {:?}", params).into());
 
     let BenchParams {
@@ -31,7 +35,15 @@ pub async fn trial_decryption_bench(params: BenchParams, spam_filter_limit: u32,
     } = params;
     let client = WasmGrpcClient::new(Client::new(lightwalletd_url.clone()));
 
-    let (total_actions, total_outputs) = trial_decrypt_range(client, pool, start_block, end_block, block_batch_size, spam_filter_limit).await;
+    let (total_actions, total_outputs) = trial_decrypt_range(
+        client,
+        pool,
+        start_block,
+        end_block,
+        block_batch_size,
+        spam_filter_limit,
+    )
+    .await;
     (total_actions + total_outputs) as f64
 }
 
@@ -46,7 +58,14 @@ pub async fn trial_decrypt_range(
     let ivks_orchard = crate::trial_decryption::dummy_ivk_orchard(1);
     let ivks_sapling = crate::trial_decryption::dummy_ivk_sapling(1);
 
-    let s = block_contents_batch_stream(client, pool, start_height, end_height, batch_size, spam_filter_limit);
+    let s = block_contents_batch_stream(
+        client,
+        pool,
+        start_height,
+        end_height,
+        batch_size,
+        spam_filter_limit,
+    );
     pin_mut!(s);
     let (mut total_actions, mut total_outputs) = (0, 0);
     while let Some((actions, outputs)) = s.next().await {
@@ -92,9 +111,7 @@ where
 
     let valid_results = compact
         .par_chunks(usize::div_ceil(compact.len(), num_parallel))
-        .map(|c| {
-            batch::try_compact_note_decryption(ivks, c)
-        })
+        .map(|c| batch::try_compact_note_decryption(ivks, c))
         .flatten()
         .flatten()
         .collect::<Vec<_>>();

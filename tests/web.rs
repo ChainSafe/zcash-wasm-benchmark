@@ -95,10 +95,23 @@ async fn tree_sync() {
     fn param_grid() -> impl Iterator<Item = TestParams> {
         let rep = 1..=REPS;
         let batch_size = vec![100, 1000, 10000];
-        let n_witnesses = vec![1,10,100];
-        let pool = vec![ShieldedPool::Sapling, ShieldedPool::Orchard, ShieldedPool::Both];
+        let n_witnesses = vec![1, 10, 100];
+        let pool = vec![
+            ShieldedPool::Sapling,
+            ShieldedPool::Orchard,
+            ShieldedPool::Both,
+        ];
 
-        itertools::iproduct!(rep, batch_size, pool, n_witnesses).map(|(rep, batch_size, pool, n_witnesses)| TestParams { rep, batch_size, pool, n_witnesses, total_updates: 0.0, time: 0.0 })
+        itertools::iproduct!(rep, batch_size, pool, n_witnesses).map(
+            |(rep, batch_size, pool, n_witnesses)| TestParams {
+                rep,
+                batch_size,
+                pool,
+                n_witnesses,
+                total_updates: 0.0,
+                time: 0.0,
+            },
+        )
     }
 
     let mut results = Vec::new();
@@ -113,7 +126,8 @@ async fn tree_sync() {
             block_batch_size: test_params.batch_size,
         };
         let start = PERFORMANCE.now();
-        let total_updates = zcash_wasm_benchmark::sync_commitment_tree_bench(params, test_params.n_witnesses).await;
+        let total_updates =
+            zcash_wasm_benchmark::sync_commitment_tree_bench(params, test_params.n_witnesses).await;
         let elapsed = PERFORMANCE.now() - start;
 
         let result = TestParams {

@@ -11,7 +11,7 @@ pub struct BenchParams {
     pub lightwalletd_url: String,
     pub start_block: u32,
     pub end_block: u32,
-    pub block_batch_size: u32
+    pub block_batch_size: u32,
 }
 
 #[wasm_bindgen]
@@ -23,7 +23,7 @@ impl BenchParams {
         lightwalletd_url: String,
         start_block: u32,
         end_block: u32,
-        block_batch_size: u32
+        block_batch_size: u32,
     ) -> BenchParams {
         BenchParams {
             network: Network::from_str(&network).unwrap(),

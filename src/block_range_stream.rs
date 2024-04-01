@@ -83,7 +83,7 @@ pub fn block_contents_batch_stream(
                                 .into_iter()
                                 .map(|action| {
                                     let action: CompactAction = action.try_into().unwrap();
-                                    let domain = OrchardDomain::for_nullifier(action.nullifier());
+                                    let domain = OrchardDomain::for_compact_action(&action);
                                     (domain, action)
                                 })
                                 .collect::<Vec<_>>()
