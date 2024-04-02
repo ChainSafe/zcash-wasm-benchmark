@@ -1,10 +1,10 @@
 # Zcash Web Wallet - Feasibility Report
 
-## Executive Summary
+## Summary
 
 ChainSafe investigated the current feasibility of a browser based wallet for Zcash. In this study we identified the essential computations that a wallet cannot hand-off to an untrusted party and developed benchmarking tests for these using Zcash mainnet block data. These tests can be run by anyone on their own system from the [benchmarking site](https://chainsafe.github.io/zcash-wasm-benchmark/) produced as part of this study.
 
-It was found that trial decryption and note commitment witness updating could be done in reasonable time for recent block ranges but woud result in a poor user experience for blocks during the DoS attack period. Halo2 transaction proofs can be generated in reasonable time for typical numbers of spends.
+It was found that trial decryption and note commitment witness updating could be done in reasonable time for recent block ranges but would result in a poor user experience for blocks during the DoS attack period. Halo2 transaction proofs can be generated in reasonable time for typical numbers of spends.
 
 ## Wallet Requirements
 
@@ -41,7 +41,7 @@ To support future web wallets a public proxy should be deployed for the public m
 
 #### Trial-Decryption
 
-For trial-decryption we used the implementation from the librustzcash [zcash_note_encryption](https://crates.io/crates/zcash_note_encryption) crate. Specifically the `batch_note_decryption` function. This was used to decrypt Sapling outouts and Orchard actions retrieved from the blocks. It wraps the RustCrypto implementation of ChaCha20-Poly1305. 
+For trial-decryption we used the implementation from the librustzcash [zcash_note_encryption](https://crates.io/crates/zcash_note_encryption) crate. Specifically the `batch_note_decryption` function. This was used to decrypt Sapling outputs and Orchard actions retrieved from the blocks. It wraps the RustCrypto implementation of ChaCha20-Poly1305. 
 
 The trial decryption benchmark collects batches of blocks, extracts their outputs or actions (or both depending on pool configuration), decrypts them, and records how many notes successfully decrypted for the provided viewing key. Transactions with more than 50 inputs/outputs/actions were filtered and presumed to be network spam. This filter can be configured with some other heuristic. 
 
@@ -140,11 +140,11 @@ Note only Orchard Halo2 proving was evaluated
 
 ### Trial Decryption
 
-In the browser we were able to download and trial-decrypt 100000 blocks (90 days of Zcash Mainnet) in around 15 seconds for both shielded pools. This corresponds to about 7700 blockes per second or around 5000 actions/outputs per second. Interestingly, over this block range, a number of the blocks must have been empty of shielded transactions as the number of outputs/actions is less than the total number of blocks.
+In the browser we were able to download and trial-decrypt 100000 blocks (90 days of Zcash Mainnet) in around 15 seconds for both shielded pools. This corresponds to about 7700 blocks per second or around 5000 actions/outputs per second. Interestingly, over this block range, a number of the blocks must have been empty of shielded transactions as the number of outputs/actions is less than the total number of blocks.
 
 Increasing the size of the batches of blocks kept in memory was effective in decreasing total decryption time however this is limited by the amount of memory available to the Wasm runtime (4GB).
 
-The successfully decrypted notes and the last synced height could be cached in persistant browser stores (e.g. IndexedDB or OPFS) and so under ideal circumstances this computation would only need to be repeated for the new blocks added since the user last opened the web wallet.
+The successfully decrypted notes and the last synced height could be cached in persistent browser stores (e.g. IndexedDB or OPFS) and so under ideal circumstances this computation would only need to be repeated for the new blocks added since the user last opened the web wallet.
 
 Trial decryption is the main wallet sync process that cannot be handed off to a third party without revealing the wallet view key and these results suggest that it can be done in a very reasonable amount of time, especially for newer wallets and those that are re-opened regularly.
 
@@ -160,7 +160,7 @@ For this test the commitments for which witnesses were tracked were located in c
 
 Again this implementation shows very reasonable sync times with large batches in the multi-threaded implementation. If both the trial-decryption and tree-sync were performed on the same block data the time to download and deserialize blocks would be amortized between both and the time less than the sum of the measured time between tests.
 
-Furthermore the tree sync does not need to be applied to from the wallet birthday to the chain tip. It only needs to be applied from the most recent uspent note. Strategies such as [BlazeSync](https://github.com/zecwalletco/zips/blob/blazesync/zip-1015.rst) and [DAGSync](https://words.str4d.xyz/dagsync-graph-aware-zcash-wallets/) could be applied to intelligently update the witnesses.
+Furthermore the tree sync does not need to be applied to from the wallet birthday to the chain tip. It only needs to be applied from the most recent unspent note. Strategies such as [BlazeSync](https://github.com/zecwalletco/zips/blob/blazesync/zip-1015.rst) and [DAGSync](https://words.str4d.xyz/dagsync-graph-aware-zcash-wallets/) could be applied to intelligently update the witnesses.
 
 ### Proving
 
