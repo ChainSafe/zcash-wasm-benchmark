@@ -16,6 +16,12 @@ build-parallel profile=default_profile: (_check-profile profile)
     @echo Building with Parallel feature in {{ profile }} mode
     wasm-pack build -t web  --{{ profile }} --out-dir demo-page/wasm-pkg/parallel --features=parallel
 
+# Build WASM binary without Parallel feature
+build-serial profile=default_profile: (_check-profile profile)
+    @echo Building with Serial feature in {{ profile }} mode
+    wasm-pack build -t web  --{{ profile }} --out-dir demo-page/wasm-pkg/serial
+
+
 _check-profile profile:
     @echo {{ if profile =~ "release|debug|profiling" { "" } else { error("Profile must be one of: release|debug|profiling") } }} > /dev/null 2>&1
 

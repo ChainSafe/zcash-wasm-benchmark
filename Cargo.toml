@@ -26,7 +26,7 @@ wasm-bindgen = "0.2.84"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 
 zcash_note_encryption = "0.4.0"
-orchard = { version = "0.8.0", default-features = false, features = ["multicore"] }
+orchard = { version = "0.8.0", default-features = false }
 getrandom = { version = "0.2.12", features = ["js"] }
 web-sys = { version = "0.3.68", features = [
     "console",
@@ -39,9 +39,7 @@ wasm-bindgen-futures = "0.4.41"
 serde = { version = "1.0.197", features = ["derive"] }
 anyhow = "1.0.80"
 serde-wasm-bindgen = "0.6.5"
-sapling = { package = "sapling-crypto", version = "0.1.1", default-features = false, features = [
-    "multicore",
-] }
+sapling = { package = "sapling-crypto", version = "0.1.1", default-features = false }
 jubjub = "0.10.0"
 ff = { version = "0.13.0" }
 shardtree = "0.3.0"
@@ -77,5 +75,5 @@ serde_json = "1.0.114"
 
 [features]
 default = ["console_error_panic_hook"]
-parallel = ["wasm-bindgen-rayon", "orchard/multicore"]
+parallel = ["wasm-bindgen-rayon", "orchard/multicore", "sapling/multicore"]
 no-bundler = ["wasm-bindgen-rayon/no-bundler"]
