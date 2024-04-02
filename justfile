@@ -17,9 +17,9 @@ build-parallel profile=default_profile: (_check-profile profile)
     wasm-pack build -t web  --{{ profile }} --out-dir demo-page/wasm-pkg/parallel --features=parallel
 
 # Build WASM binary without Parallel feature
-build-serial profile=default_profile: (_check-profile profile)
+build-snap profile=default_profile: (_check-profile profile)
     @echo Building with Serial feature in {{ profile }} mode
-    wasm-pack build -t web  --{{ profile }} --out-dir demo-page/wasm-pkg/serial
+    wasm-pack build -t bundler  --{{ profile }} --out-dir zcash-test-snap/packages/snap/wasm-pkg
 
 
 _check-profile profile:

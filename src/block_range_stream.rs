@@ -9,7 +9,8 @@ use crate::bench_params::ShieldedPool;
 use crate::console_log;
 use crate::proto::compact_formats::CompactBlock;
 use crate::proto::service::{BlockId, BlockRange};
-use crate::{WasmGrpcClient, PERFORMANCE};
+use crate::{WasmGrpcClient};
+use js_sys::Date as DATE;
 
 /// return a stream over a range of blocks.
 pub async fn block_range_stream(
@@ -49,7 +50,7 @@ pub fn block_contents_batch_stream(
     ),
 > {
     async_stream::stream! {
-        let overall_start = PERFORMANCE.now();
+        let overall_start = DATE::now();
 
         let mut blocks_processed = 0;
         let mut actions_processed = 0;
@@ -63,7 +64,7 @@ pub fn block_contents_batch_stream(
                     .await
                     .try_chunks(batch_size as usize);
             while let Ok(Some(blocks)) = chunked_block_stream.try_next().await {
-                let start = PERFORMANCE.now();
+                let start = DATE::now();
                 let blocks_len = blocks.len();
                 let range_start = blocks.first().unwrap().height;
                 let range_end = blocks.last().unwrap().height;
@@ -135,13 +136,13 @@ Processed {} blocks in range: [{}, {}] in {}ms
                     blocks_len,
                     range_start,
                     range_end,
-                    PERFORMANCE.now() - start,
+                    DATE::now() - start,
                     actions_processed,
                     outputs_processed,
                     blocks_processed,
                     end_height - start_height - blocks_processed as u32,
                     ((blocks_processed as f64 / (end_height - start_height) as f64) * 100.0).round(),
-                    PERFORMANCE.now() - overall_start
+                    DATE::now() - overall_start
                 );
             }
             console_log!("GRPC Stream Disconnected or Ended, will reconnect if more blocks needed");
