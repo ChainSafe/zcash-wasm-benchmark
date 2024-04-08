@@ -6,8 +6,8 @@ const SAPLING_ACTIVATION = 419200;
 const ORCHARD_ACTIVATION = 1687104;
 const TIP = 2442739;
 
-const MAINNET_LIGHTWALLETD_PROXY = "http://localhost:443";
-const TESTNET_LIGHTWALLETD_PROXY = "http://testnet.localhost:443";
+const MAINNET_LIGHTWALLETD_PROXY = "https://zcash-mainnet.chainsafe.dev";
+const TESTNET_LIGHTWALLETD_PROXY = "https://zcash-testnet.chainsafe.dev";
 
 export function App() {
 
