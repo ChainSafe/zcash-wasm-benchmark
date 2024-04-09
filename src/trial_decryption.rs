@@ -7,6 +7,7 @@ use web_sys::console;
 
 use ff::Field;
 use orchard::keys::{FullViewingKey, PreparedIncomingViewingKey, Scope, SpendingKey};
+use zcash_primitives::consensus;
 
 use crate::{console_debug, console_log};
 use sapling::keys::SaplingIvk;
@@ -21,9 +22,43 @@ use crate::WasmGrpcClient;
 pub async fn trial_decryption_bench(
     params: BenchParams,
     spam_filter_limit: u32,
-    _view_key: Option<Vec<u8>>,
+    unified_view_key: Option<String>,
 ) -> f64 {
-    console::log_1(&format!("Starting Trial Decryption with params: {:?}", params).into());
+    console_log!("Starting Trial Decryption with params: {:?}", params);
+    let (ivks_orchard, ivks_sapling) = if let Some(unified_view_key) = unified_view_key {
+        console_log!("Key Provided! Unified View Key: {:?}", unified_view_key);
+        if let Ok((orchard, sapling)) = zcash_keys::keys::UnifiedFullViewingKey::decode(
+            &consensus::MAIN_NETWORK,
+            &unified_view_key,
+        )
+        .and_then(|k| {
+            Ok(zcash_keys::keys::UnifiedFullViewingKey::to_unified_incoming_viewing_key(&k))
+        })
+        .and_then(|k| {
+            if let (Some(orchard), Some(sapling)) = (k.orchard(), k.sapling()) {
+                Ok((
+                    vec![orchard::keys::PreparedIncomingViewingKey::new(&orchard)],
+                    vec![sapling.prepare()],
+                ))
+            } else {
+                Err("Invalid Unified View Key".to_string())
+            }
+        }) {
+            (orchard, sapling)
+        } else {
+            console_log!("Invalid Unified View Keys. Using dummy keys");
+            (
+                crate::trial_decryption::dummy_ivk_orchard(1),
+                crate::trial_decryption::dummy_ivk_sapling(1),
+            )
+        }
+    } else {
+        console_log!("No Key Provided. Using dummy keys");
+        (
+            crate::trial_decryption::dummy_ivk_orchard(1),
+            crate::trial_decryption::dummy_ivk_sapling(1),
+        )
+    };
 
     let BenchParams {
         network: _,
@@ -42,6 +77,8 @@ pub async fn trial_decryption_bench(
         end_block,
         block_batch_size,
         spam_filter_limit,
+        ivks_orchard,
+        ivks_sapling,
     )
     .await;
     (total_actions + total_outputs) as f64
@@ -54,10 +91,9 @@ pub async fn trial_decrypt_range(
     end_height: u32,
     batch_size: u32,
     spam_filter_limit: u32,
+    ivks_orchard: Vec<orchard::keys::PreparedIncomingViewingKey>,
+    ivks_sapling: Vec<sapling::keys::PreparedIncomingViewingKey>,
 ) -> (u32, u32) {
-    let ivks_orchard = crate::trial_decryption::dummy_ivk_orchard(1);
-    let ivks_sapling = crate::trial_decryption::dummy_ivk_sapling(1);
-
     let s = block_contents_batch_stream(
         client,
         pool,
