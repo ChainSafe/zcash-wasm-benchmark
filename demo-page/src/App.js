@@ -30,6 +30,7 @@ export function App() {
     let [spamFilterLimit, setSpamFilterLimit] = useState(50);
     let [witnesses, setWitnesses] = useState(10);
     let [proofGenerationSpends, setProofGenerationSpends] = useState(1);
+    let [viewingKey, setViewingKey] = useState("zxviews1q0duytgcqqqqpqre26wkl45gvwwwd706xw608hucmvfalr759ejwf7qshjf5r9aa7323zulvz6plhttp5mltqcgs9t039cx2d09mgq05ts63n8u35hyv6h9nc9ctqqtue2u7cer2mqegunuulq2luhq3ywjcz35yyljewa4mgkgjzyfwh6fr6jd0dzd44ghk0nxdv2hnv4j5nxfwv24rwdmgllhe0p8568sgqt9ckt02v2kxf5ahtql6s0ltjpkckw8gtymxtxuu9gcr0swvz");
 
     // Event Handlers
     function onNetworkUpdate(network) {
@@ -57,7 +58,7 @@ export function App() {
     }
 
     async function runTrialDecryption() {
-        await trial_decryption_bench(current_params(), spamFilterLimit);
+        await trial_decryption_bench(current_params(), spamFilterLimit, viewingKey);
     }
 
     async function runTreeStateSync() {
@@ -133,6 +134,10 @@ export function App() {
                 <p>
                     Download all blocks in the provided range and trial decrypt all transactions
                 </p>
+                <label>
+                    Unified Viewing Key:
+                    <input type="text" value={viewingKey} onChange={(e) => setViewingKey(String(e.target.value))}/>
+                </label>
                 <label>
                     Skip txns with outputs greater than:
                     <input type="number" value={spamFilterLimit} onChange={(e) => setSpamFilterLimit(e.target.value)} />

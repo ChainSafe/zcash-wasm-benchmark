@@ -36,7 +36,7 @@ pub async fn block_range_stream(
 /// The stream will yield a tuple of accumulated (orchard_actions, sapling_outputs) for each batch.
 /// The pool parameter determines which contents should be returned (orchard, sapling or both)
 pub fn block_contents_batch_stream(
-    mut client: WasmGrpcClient,
+    client: &mut WasmGrpcClient,
     pool: ShieldedPool,
     start_height: u32,
     end_height: u32,
@@ -47,7 +47,7 @@ pub fn block_contents_batch_stream(
         Vec<(OrchardDomain, CompactAction)>,
         Vec<(SaplingDomain, CompactOutputDescription)>,
     ),
-> {
+> + '_ {
     async_stream::stream! {
         let overall_start = PERFORMANCE.now();
 
@@ -59,7 +59,7 @@ pub fn block_contents_batch_stream(
 
         while latest_synced < end_height as u64 {
             let mut chunked_block_stream =
-                block_range_stream(&mut client, latest_synced as u32, end_height)
+                block_range_stream(client, latest_synced as u32, end_height)
                     .await
                     .try_chunks(batch_size as usize);
             while let Ok(Some(blocks)) = chunked_block_stream.try_next().await {

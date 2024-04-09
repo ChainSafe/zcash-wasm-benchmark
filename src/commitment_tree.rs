@@ -71,7 +71,7 @@ pub async fn sync_commitment_tree_bench(params: BenchParams, n_witnesses: u32) -
         .unwrap();
 
     let s = block_contents_batch_stream(
-        client,
+        &mut client,
         pool,
         start_block,
         end_block,
