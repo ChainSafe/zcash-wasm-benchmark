@@ -90,7 +90,7 @@ pub async fn sync_commitment_tree_bench(params: BenchParams, n_witnesses: u32) -
         batch_insert_from_orchard_actions(
             &mut orchard_tree,
             orchard_cursor,
-            actions.into_iter().map(|(domain, action)| {
+            actions.into_iter().map(|(domain, action, _)| {
                 (
                     domain,
                     action,
@@ -106,7 +106,7 @@ pub async fn sync_commitment_tree_bench(params: BenchParams, n_witnesses: u32) -
         batch_insert_from_sapling_outputs(
             &mut sapling_tree,
             sapling_cursor,
-            outputs.into_iter().map(|(domain, output)| {
+            outputs.into_iter().map(|(domain, output, _)| {
                 (
                     domain,
                     output,

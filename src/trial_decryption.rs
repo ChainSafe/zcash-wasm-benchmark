@@ -1,14 +1,22 @@
+use std::convert::TryInto;
+use std::sync::Arc;
+
 use futures_util::{pin_mut, StreamExt};
+use orchard::note_encryption::OrchardDomain;
 use rand::rngs::OsRng;
 use rayon::prelude::*;
+use sapling::note_encryption::{SaplingDomain, Zip212Enforcement};
 use tonic_web_wasm_client::Client;
 use wasm_bindgen::prelude::*;
-use web_sys::console;
 
 use ff::Field;
 use orchard::keys::{FullViewingKey, PreparedIncomingViewingKey, Scope, SpendingKey};
+use zcash_primitives::consensus::BranchId;
+use zcash_primitives::memo::Memo;
+use zcash_primitives::transaction::Transaction;
 use zcash_primitives::{consensus, constants};
 
+use crate::proto::service::TxFilter;
 use crate::{console_debug, console_log};
 use sapling::keys::SaplingIvk;
 use zcash_note_encryption::{batch, BatchDomain, Domain, ShieldedOutput, COMPACT_NOTE_SIZE};
@@ -129,8 +137,9 @@ pub async fn trial_decrypt_range(
     ivks_orchard: Vec<orchard::keys::PreparedIncomingViewingKey>,
     ivks_sapling: Vec<sapling::keys::PreparedIncomingViewingKey>,
 ) -> (u32, u32) {
+    let mut client_clone = client.clone();
     let s = block_contents_batch_stream(
-        client,
+        &mut client_clone,
         pool,
         start_height,
         end_height,
@@ -139,25 +148,124 @@ pub async fn trial_decrypt_range(
     );
     pin_mut!(s);
     let (mut total_actions, mut total_outputs) = (0, 0);
+    let ivks_orchard = Arc::new(ivks_orchard);
+    let ivks_sapling = Arc::new(ivks_sapling.clone());
     while let Some((actions, outputs)) = s.next().await {
         total_actions += actions.len() as u32;
         total_outputs += outputs.len() as u32;
 
-        let ivks_orchard = ivks_orchard.clone();
-        let ivks_sapling = ivks_sapling.clone();
-        let (tx, rx) = futures_channel::oneshot::channel();
+        let (tx_orchard, rx_orchard) = futures_channel::oneshot::channel();
+        let (tx_sapling, rx_sapling) = futures_channel::oneshot::channel();
+        let (actions, txid_actions): (Vec<(_, _)>, Vec<Vec<u8>>) = actions
+            .into_iter()
+            .map(|(d, a, txid)| ((d, a), txid))
+            .unzip();
+        let (outputs, txid_outputs): (Vec<(_, _)>, Vec<Vec<u8>>) = outputs
+            .into_iter()
+            .map(|(d, a, txid)| ((d, a), txid))
+            .unzip();
+
+        let ivks_orchard_c = ivks_orchard.clone();
+        let ivks_sapling_c = ivks_sapling.clone();
         rayon::scope(|s| {
             s.spawn(|_| {
-                batch_decrypt_compact(ivks_orchard.as_slice(), &actions);
-                batch_decrypt_compact(ivks_sapling.as_slice(), &outputs);
+                let res_o =
+                    batch_decrypt_compact(ivks_orchard_c.as_slice(), &actions, txid_actions);
+                let res_s =
+                    batch_decrypt_compact(ivks_sapling_c.as_slice(), &outputs, txid_outputs);
                 drop(actions);
                 drop(outputs);
-                tx.send(()).unwrap();
+                tx_orchard.send(res_o).unwrap();
+                tx_sapling.send(res_s).unwrap();
             })
         });
 
-        console_debug!("Awaiting decryption completion");
-        rx.await.unwrap();
+        console_debug!("Awaiting Orchard decryption completion");
+        let decryped_orchard = rx_orchard.await.unwrap();
+        console_debug!("Awaiting Sapling decryption completion");
+        let decrypted_sapling = rx_sapling.await.unwrap();
+        console_debug!("Batch decrtyp completed");
+        for ((_, _), tx_id) in decryped_orchard {
+            let tx_filter = TxFilter {
+                block: None,
+                index: 0,
+                hash: tx_id.clone(),
+            };
+            let tx = client
+                .get_transaction(tx_filter)
+                .await
+                .unwrap()
+                .into_inner();
+            let tx = Transaction::read(
+                &tx.data[..],
+                BranchId::for_height(&consensus::MAIN_NETWORK, tx.height.try_into().unwrap()),
+            )
+            .unwrap();
+            let orchard_full_actions = tx
+                .orchard_bundle()
+                .unwrap() // can unwrap here because we know there are orchard outputs in this tx
+                .actions()
+                .into_iter()
+                .cloned()
+                .map(|a| (OrchardDomain::for_action(&a), a))
+                .collect::<Vec<_>>();
+
+            let decryped_actions = batch::try_note_decryption(
+                ivks_orchard.as_slice(),
+                orchard_full_actions.as_slice(),
+            )
+            .into_iter()
+            .filter_map(std::convert::identity)
+            .collect::<Vec<_>>();
+
+            for a in decryped_actions.iter() {
+                console_log!(
+                    "Decrypted Orchard Memo Tx Id: {:?}\nMemo: {:?}",
+                    hex::encode(&tx_id),
+                    Memo::from_bytes((a.0 .2).as_slice()).unwrap()
+                );
+            }
+        }
+
+        for ((_, _), tx_id) in decrypted_sapling {
+            let tx_filter = TxFilter {
+                block: None,
+                index: 0,
+                hash: tx_id.clone(),
+            };
+            let tx = client
+                .get_transaction(tx_filter)
+                .await
+                .unwrap()
+                .into_inner();
+            let tx = Transaction::read(
+                &tx.data[..],
+                BranchId::for_height(&consensus::MAIN_NETWORK, tx.height.try_into().unwrap()),
+            )
+            .unwrap();
+            let sapling_full_outputs = tx
+                .sapling_bundle()
+                .unwrap()
+                .shielded_outputs()
+                .into_iter()
+                .cloned()
+                .map(|o| (SaplingDomain::new(Zip212Enforcement::On), o))
+                .collect::<Vec<_>>();
+            let decryped_outputs = batch::try_note_decryption(
+                ivks_sapling.as_slice(),
+                sapling_full_outputs.as_slice(),
+            )
+            .into_iter()
+            .filter_map(std::convert::identity)
+            .collect::<Vec<_>>();
+            for o in decryped_outputs.iter() {
+                console_log!(
+                    "Decrypted Sapling Memo Tx Id: {:?}\nMemo: {:?}",
+                    hex::encode(&tx_id),
+                    Memo::from_bytes((o.0 .2).as_slice()).unwrap()
+                );
+            }
+        }
     }
 
     console_log!("Decryption complete");
@@ -167,7 +275,11 @@ pub async fn trial_decrypt_range(
 pub(crate) fn batch_decrypt_compact<D: BatchDomain, Output: ShieldedOutput<D, COMPACT_NOTE_SIZE>>(
     ivks: &[D::IncomingViewingKey],
     compact: &[(D, Output)],
-) -> u32
+    txid: Vec<Vec<u8>>,
+) -> Vec<(
+    ((<D as Domain>::Note, <D as Domain>::Recipient), usize),
+    Vec<u8>,
+)>
 where
     (D, Output): Sync + Send,
     <D as Domain>::Note: Send + std::fmt::Debug,
@@ -176,23 +288,30 @@ where
 {
     if compact.is_empty() {
         console_debug!("No outputs to decrypt");
-        return 0;
+        return vec![];
     }
     let num_parallel = rayon::current_num_threads();
 
     let valid_results = compact
         .par_chunks(usize::div_ceil(compact.len(), num_parallel))
         .map(|c| batch::try_compact_note_decryption(ivks, c))
+        .zip(
+            txid.into_par_iter()
+                .chunks(usize::div_ceil(compact.len(), num_parallel)),
+        )
         .flatten()
-        .flatten()
+        .filter_map(|(r, txid)| match r {
+            Some(r) => Some((r, txid)),
+            None => None,
+        })
         .collect::<Vec<_>>();
 
     if valid_results.is_empty() {
         console_debug!("No notes for this address");
     } else {
-        console_log!("Notes: {:?}", valid_results);
+        console_log!("Decrypted {:?} notes", valid_results.len());
     }
-    compact.len() as u32
+    valid_results
 }
 
 pub(crate) fn dummy_ivk_sapling(

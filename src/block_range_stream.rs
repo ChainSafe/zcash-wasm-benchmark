@@ -6,9 +6,9 @@ use orchard::note_encryption::{CompactAction, OrchardDomain};
 use sapling::note_encryption::{CompactOutputDescription, SaplingDomain, Zip212Enforcement};
 
 use crate::bench_params::ShieldedPool;
-use crate::console_log;
 use crate::proto::compact_formats::CompactBlock;
 use crate::proto::service::{BlockId, BlockRange};
+use crate::{console_debug, console_log};
 use crate::{WasmGrpcClient, PERFORMANCE};
 
 /// return a stream over a range of blocks.
@@ -44,8 +44,8 @@ pub fn block_contents_batch_stream(
     spam_filter_limit: u32,
 ) -> impl Stream<
     Item = (
-        Vec<(OrchardDomain, CompactAction)>,
-        Vec<(SaplingDomain, CompactOutputDescription)>,
+        Vec<(OrchardDomain, CompactAction, Vec<u8>)>,
+        Vec<(SaplingDomain, CompactOutputDescription, Vec<u8>)>,
     ),
 > + '_ {
     async_stream::stream! {
@@ -71,9 +71,10 @@ pub fn block_contents_batch_stream(
                 let (actions, outputs) = blocks.into_iter().flat_map(|b| b.vtx.into_iter()).fold(
                     (vec![], vec![]),
                     |(mut actions, mut outputs), tx| {
+                        let tx_id = tx.hash.clone();
                         let mut act = if pool.sync_orchard() {
                             if tx.actions.len() > spam_filter_limit as usize {
-                                console_log!(
+                                console_debug!(
                                     "Skipped a transaction with {} actions",
                                     tx.actions.len()
                                 );
@@ -84,7 +85,7 @@ pub fn block_contents_batch_stream(
                                 .map(|action| {
                                     let action: CompactAction = action.try_into().unwrap();
                                     let domain = OrchardDomain::for_compact_action(&action);
-                                    (domain, action)
+                                    (domain, action, tx_id.clone())
                                 })
                                 .collect::<Vec<_>>()
                             }
@@ -94,7 +95,7 @@ pub fn block_contents_batch_stream(
                         };
                         let mut opt = if pool.sync_sapling() {
                             if tx.outputs.len() > spam_filter_limit as usize {
-                                console_log!(
+                                console_debug!(
                                     "Skipped a transaction with {} actions",
                                     tx.outputs.len()
                                 );
@@ -104,7 +105,7 @@ pub fn block_contents_batch_stream(
                                 .into_iter()
                                 .map(|output| {
                                     let output: CompactOutputDescription = output.try_into().unwrap();
-                                    (SaplingDomain::new(Zip212Enforcement::On), output)
+                                    (SaplingDomain::new(Zip212Enforcement::On), output, tx_id.clone())
                                 })
                                 .collect::<Vec<_>>()
                             }
@@ -124,7 +125,7 @@ pub fn block_contents_batch_stream(
 
                 yield (actions, outputs);
 
-                console_log!(
+                console_debug!(
                     "
 Processed {} blocks in range: [{}, {}] in {}ms
 - Orchard Actions Processed: {}
@@ -144,7 +145,7 @@ Processed {} blocks in range: [{}, {}] in {}ms
                     PERFORMANCE.now() - overall_start
                 );
             }
-            console_log!("GRPC Stream Disconnected or Ended, will reconnect if more blocks needed");
+            console_debug!("GRPC Stream Disconnected or Ended, will reconnect if more blocks needed");
         }
         console_log!("Block contents stream complete");
     }
