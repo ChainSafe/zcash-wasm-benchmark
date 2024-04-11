@@ -55,7 +55,6 @@ pub async fn trial_decryption_bench(
                 ),
             })
         });
-        // console_log!("Key Provided! Unified View Key: {:?}", unified_view_key);
         match uvk {
             Ok((o, s)) => {
                 console_log!("Successfully decoded Unified View Key: {:?}", (&o, &s));
@@ -180,11 +179,11 @@ pub async fn trial_decrypt_range(
             })
         });
 
-        console_debug!("Awaiting Orchard decryption completion");
+        console_debug!("Decryption results channels: await");
         let decryped_orchard = rx_orchard.await.unwrap();
-        console_debug!("Awaiting Sapling decryption completion");
         let decrypted_sapling = rx_sapling.await.unwrap();
-        console_debug!("Batch decrtyp completed");
+        console_debug!("Decryption results channels: resolved");
+        
         for ((_, _), tx_id) in decryped_orchard {
             let tx_filter = TxFilter {
                 block: None,
