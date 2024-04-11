@@ -5,6 +5,7 @@ default:
 
 alias b := build-rust
 
+# Build both the WASM binary and the web page
 build: build-rust build-page
 
 # Build both parallel and non parallel WASM binaries
@@ -37,10 +38,17 @@ test-headless-chrome *FLAGS:
 
 # Clean the WASM binaries and other artifacts from wasm-pack
 clean-wasm:
-    rm -rf blockstream/wasm-pkg
+    rm -rf demo-page/wasm-pkg
+
+# Clean parcel-cache and dist
+clean-dist:
+    rm -rf demo-page/dist demo-page/.parcel-cache
+
+# Clean Web build
+clean-web: clean-dist clean-wasm
 
 # Clean all
-clean: clean-wasm
+clean: clean-web
     rm -rf target
 
 # Use the protobuf definitions to generate the javascript files for grpc-web
