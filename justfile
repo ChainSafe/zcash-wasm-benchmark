@@ -5,6 +5,8 @@ default:
 
 alias b := build-rust
 
+run: clean-web build serve
+
 # Build both the WASM binary and the web page
 build: build-rust build-page
 
